@@ -820,8 +820,8 @@ function showPanel(id){
   const actions={
     global:`<button class="btn btn-ink btn-sm" onclick="openAddImm()">+ Immeuble</button>`,
     factures:'',
-    dep:`<button class="btn btn-out btn-sm" onclick="exportCSV('dep')">⬇ CSV</button><button class="btn btn-out btn-sm" onclick="openBail()">📅 Bail / Loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('dep')">+ Dépense</button>`,
-    rev:`<button class="btn btn-out btn-sm" onclick="exportCSV('rev')">⬇ CSV</button><button class="btn btn-pur btn-sm" onclick="openBail()">📅 Générer loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('rev')">+ Revenu</button>`,
+    dep:`<button class="btn btn-out btn-sm" onclick="exportCSV('dep')">⬇ CSV</button><button class="btn btn-out btn-sm" onclick="genPDF('dep')">📄 Rapport PDF</button><button class="btn btn-out btn-sm" onclick="openBail()">📅 Bail / Loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('dep')">+ Dépense</button>`,
+    rev:`<button class="btn btn-out btn-sm" onclick="exportCSV('rev')">⬇ CSV</button><button class="btn btn-out btn-sm" onclick="genPDF('rev')">📄 Rapport PDF</button><button class="btn btn-pur btn-sm" onclick="openBail()">📅 Générer loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('rev')">+ Revenu</button>`,
     res:''
   };
   $('topbar-actions').innerHTML=actions[id]||'';
@@ -1742,8 +1742,178 @@ function driveDisconnect(){
 }
 
 // ══════════════════════════════════════════════════
-// MOT DE PASSE
+// RAPPORT PDF
 // ══════════════════════════════════════════════════
+function genPDF(type){
+  const imm=activeImm();if(!imm){toast('Aucun immeuble actif','err');return;}
+  const isDep=type==='dep';
+  const items=isDep?[...imm.depenses]:[...imm.revenus];
+  items.sort((a,b)=>a.date.localeCompare(b.date));
+  const titre=isDep?'Rapport des dépenses':'Rapport des revenus';
+  const annee=imm.year||new Date().getFullYear();
+  const total=isDep
+    ?items.reduce((s,d)=>s+(d.montant||0)+(d.tax||0),0)
+    :items.reduce((s,r)=>s+(r.montant||0),0);
+
+  // Group by category
+  const byCat={};
+  items.forEach(x=>{
+    const k=x.cat||'Autres';
+    if(!byCat[k])byCat[k]={total:0,count:0};
+    byCat[k].total+=(isDep?(x.montant||0)+(x.tax||0):(x.montant||0));
+    byCat[k].count++;
+  });
+
+  // Build HTML for PDF
+  let html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+  <title>${titre} — ${imm.name} ${annee}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a2e}
+    /* COVER */
+    .cover{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1a1a2e;color:#fff;text-align:center;page-break-after:always}
+    .cover-logo{font-size:2.5rem;font-weight:700;margin-bottom:.5rem}
+    .cover-logo span{color:#34a367}
+    .cover-title{font-size:1.5rem;margin:1.5rem 0 .5rem;opacity:.9}
+    .cover-imm{font-size:1.1rem;opacity:.7;margin-bottom:2rem}
+    .cover-stats{display:flex;gap:2rem;justify-content:center;margin-top:1rem}
+    .cover-stat{background:rgba(255,255,255,.1);border-radius:10px;padding:1rem 1.5rem;text-align:center}
+    .cover-stat .val{font-size:1.4rem;font-weight:700;color:#34a367}
+    .cover-stat .lbl{font-size:11px;opacity:.6;margin-top:4px}
+    /* SOMMAIRE */
+    .page{padding:2rem;page-break-after:always}
+    .page-title{font-size:1.2rem;font-weight:700;color:#1a1a2e;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:2px solid #e4e2da}
+    table{width:100%;border-collapse:collapse;margin-bottom:1rem}
+    th{background:#f2f1ed;padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:#4a4a6a;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e4e2da}
+    td{padding:8px 10px;border-bottom:1px solid #f2f1ed;font-size:12px}
+    tr:nth-child(even) td{background:#f8f7f3}
+    .total-row td{background:#1a1a2e!important;color:#fff;font-weight:700;font-size:13px}
+    .amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+    .pos{color:#1e6b47}.neg{color:#b91c1c}
+    .badge{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:600;background:#e4e2da}
+    /* FACTURE PAGE */
+    .facture-page{padding:1.5rem;page-break-after:always;min-height:100vh}
+    .facture-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:2px solid #1a1a2e}
+    .facture-num{font-size:11px;color:#9090b0}
+    .facture-info{background:#f2f1ed;border-radius:8px;padding:.75rem 1rem;margin-bottom:1rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+    .facture-info .fi{display:flex;flex-direction:column;gap:2px}
+    .facture-info .fi-label{font-size:10px;color:#9090b0;text-transform:uppercase;letter-spacing:.05em}
+    .facture-info .fi-val{font-size:13px;font-weight:600}
+    .facture-img{width:100%;max-height:580px;object-fit:contain;border:1px solid #e4e2da;border-radius:8px;display:block}
+    .facture-noimg{width:100%;height:300px;display:flex;align-items:center;justify-content:center;background:#f8f7f3;border:1px dashed #ccc9be;border-radius:8px;color:#9090b0;font-size:14px;flex-direction:column;gap:.5rem}
+    .footer{text-align:center;font-size:10px;color:#9090b0;margin-top:1rem;padding-top:.5rem;border-top:1px solid #e4e2da}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  </style></head><body>`;
+
+  // COVER PAGE
+  html+=`<div class="cover">
+    <div class="cover-logo">Immo<span>Compta</span></div>
+    <div style="font-size:14px;opacity:.5;margin-bottom:2rem">Rapport comptable</div>
+    <div class="cover-title">${titre}</div>
+    <div class="cover-imm">${imm.name}${imm.addr?' · '+imm.addr:''}</div>
+    <div style="font-size:1.2rem;opacity:.6">Année ${annee}</div>
+    <div class="cover-stats">
+      <div class="cover-stat"><div class="val">${items.length}</div><div class="lbl">${isDep?'Dépenses':'Revenus'}</div></div>
+      <div class="cover-stat"><div class="val" style="color:${isDep?'#e05252':'#34a367'}">${fmt(total)}</div><div class="lbl">Total ${isDep?'TTC':''}</div></div>
+      <div class="cover-stat"><div class="val">${Object.keys(byCat).length}</div><div class="lbl">Catégories</div></div>
+    </div>
+    <div style="margin-top:3rem;font-size:11px;opacity:.3">Généré le ${new Date().toLocaleDateString('fr-CA')} · ImmoCompta Pro</div>
+  </div>`;
+
+  // SOMMAIRE PAGE
+  html+=`<div class="page">
+    <div class="page-title">📊 Sommaire par catégorie</div>
+    <table>
+      <thead><tr><th>Catégorie</th><th>Nombre</th><th class="amt">Montant</th><th class="amt">%</th></tr></thead>
+      <tbody>
+        ${Object.entries(byCat).sort((a,b)=>b[1].total-a[1].total).map(([cat,data])=>`
+          <tr>
+            <td><span class="badge">${cat}</span></td>
+            <td>${data.count}</td>
+            <td class="amt ${isDep?'neg':'pos'}">${fmt(data.total)}</td>
+            <td class="amt" style="color:#9090b0">${total?((data.total/total)*100).toFixed(1)+'%':'—'}</td>
+          </tr>`).join('')}
+        <tr class="total-row"><td>TOTAL</td><td>${items.length}</td><td class="amt">${fmt(total)}</td><td class="amt">100%</td></tr>
+      </tbody>
+    </table>
+
+    <div class="page-title" style="margin-top:1.5rem">📋 Liste complète</div>
+    <table>
+      <thead><tr><th>#</th><th>Date</th><th>Description</th><th>Catégorie</th><th>${isDep?'Fournisseur':'Source'}</th><th class="amt">${isDep?'Montant HT':'Montant'}</th>${isDep?'<th class="amt">TPS/TVQ</th><th class="amt">Total TTC</th>':''}</tr></thead>
+      <tbody>
+        ${items.map((x,i)=>`<tr>
+          <td style="color:#9090b0">${i+1}</td>
+          <td style="white-space:nowrap">${x.date||''}</td>
+          <td>${x.desc||''}</td>
+          <td><span class="badge">${x.cat||''}</span></td>
+          <td>${isDep?(x.fournisseur||''):(x.source||'')}</td>
+          <td class="amt ${isDep?'neg':'pos'}">${fmt(isDep?x.montant:x.montant)}</td>
+          ${isDep?`<td class="amt">${x.tax?fmt(x.tax):''}</td><td class="amt neg">${fmt((x.montant||0)+(x.tax||0))}</td>`:''}
+        </tr>`).join('')}
+        <tr class="total-row"><td colspan="${isDep?5:4}">TOTAL</td><td class="amt">${isDep?fmt(items.reduce((s,d)=>s+(d.montant||0),0)):fmt(total)}</td>${isDep?`<td class="amt">${fmt(items.reduce((s,d)=>s+(d.tax||0),0))}</td><td class="amt">${fmt(total)}</td>`:''}</tr>
+      </tbody>
+    </table>
+    <div class="footer">${imm.name} · ${titre} ${annee} · ImmoCompta Pro</div>
+  </div>`;
+
+  // ONE PAGE PER RECEIPT
+  const avecFacture=items.filter(x=>x.receipt);
+  const sansFacture=items.filter(x=>!x.receipt);
+
+  avecFacture.forEach((x,i)=>{
+    const isImg=x.receipt&&x.receipt.startsWith('data:image');
+    const montantAff=isDep?fmt((x.montant||0)+(x.tax||0)):fmt(x.montant||0);
+    html+=`<div class="facture-page">
+      <div class="facture-header">
+        <div>
+          <div style="font-size:14px;font-weight:700">${x.desc||'Sans description'}</div>
+          <div class="facture-num">Facture ${i+1} sur ${avecFacture.length} · ${imm.name}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:700;color:${isDep?'#b91c1c':'#1e6b47'}">${montantAff}</div>
+          <div style="font-size:11px;color:#9090b0">${x.date||''}</div>
+        </div>
+      </div>
+      <div class="facture-info">
+        <div class="fi"><div class="fi-label">Catégorie</div><div class="fi-val">${x.cat||'—'}</div></div>
+        <div class="fi"><div class="fi-label">${isDep?'Fournisseur':'Source'}</div><div class="fi-val">${isDep?(x.fournisseur||'—'):(x.source||'—')}</div></div>
+        ${isDep?`<div class="fi"><div class="fi-label">Montant HT</div><div class="fi-val">${fmt(x.montant)}</div></div><div class="fi"><div class="fi-label">TPS/TVQ</div><div class="fi-val">${x.tax?fmt(x.tax):'—'}</div></div>`:`<div class="fi"><div class="fi-label">Unité</div><div class="fi-val">${x.unite||'—'}</div></div>`}
+        ${x.notes?`<div class="fi" style="grid-column:1/-1"><div class="fi-label">Notes</div><div class="fi-val">${x.notes}</div></div>`:''}
+      </div>
+      ${isImg?`<img src="${x.receipt}" class="facture-img" alt="Facture">`:
+        `<div class="facture-noimg">📄<span style="font-size:12px">${x.receiptName||'Document PDF'}</span><span style="font-size:11px;color:#ccc">Ouvrez le fichier original pour voir le PDF</span></div>`}
+      <div class="footer">${imm.name} · ${titre} ${annee} · ImmoCompta Pro</div>
+    </div>`;
+  });
+
+  // Page for items without receipt
+  if(sansFacture.length){
+    html+=`<div class="page">
+      <div class="page-title">⚠️ Entrées sans facture jointe (${sansFacture.length})</div>
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th>Catégorie</th><th>${isDep?'Fournisseur':'Source'}</th><th class="amt">Montant</th></tr></thead>
+        <tbody>${sansFacture.map(x=>`<tr>
+          <td>${x.date||''}</td><td>${x.desc||''}</td>
+          <td><span class="badge">${x.cat||''}</span></td>
+          <td>${isDep?(x.fournisseur||''):(x.source||'')}</td>
+          <td class="amt ${isDep?'neg':'pos'}">${fmt(isDep?(x.montant||0)+(x.tax||0):x.montant||0)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+      <div class="footer">${imm.name} · ${titre} ${annee} · ImmoCompta Pro</div>
+    </div>`;
+  }
+
+  html+=`</body></html>`;
+
+  // Open in new window and print
+  const win=window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  win.onload=()=>{
+    setTimeout(()=>win.print(), 500);
+  };
+  toast('📄 Rapport généré — utilisez Imprimer → Enregistrer en PDF', 'ok');
+}
 const DEFAULT_PW = 'immo2025';
 function hashPw(pw){ let h=0;for(let i=0;i<pw.length;i++){h=((h<<5)-h)+pw.charCodeAt(i);h|=0;}return String(h); }
 function checkPw(){
