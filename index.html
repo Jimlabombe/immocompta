@@ -822,7 +822,7 @@ function showPanel(id){
     factures:'',
     dep:`<button class="btn btn-out btn-sm" onclick="exportCSV('dep')">⬇ CSV</button><button class="btn btn-out btn-sm" onclick="genPDF('dep')">📄 Rapport PDF</button><button class="btn btn-out btn-sm" onclick="openBail()">📅 Bail / Loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('dep')">+ Dépense</button>`,
     rev:`<button class="btn btn-out btn-sm" onclick="exportCSV('rev')">⬇ CSV</button><button class="btn btn-out btn-sm" onclick="genPDF('rev')">📄 Rapport PDF</button><button class="btn btn-pur btn-sm" onclick="openBail()">📅 Générer loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('rev')">+ Revenu</button>`,
-    res:''
+    res:`<button class="btn btn-out btn-sm" onclick="genResPDF()">📄 Rapport PDF résultats</button>`
   };
   $('topbar-actions').innerHTML=actions[id]||'';
 
@@ -1293,38 +1293,46 @@ async function runScan(file,type){
   const b64=curScanData.split(',')[1];
   const isPdf=file.type==='application/pdf';
 
-  const sysDep=`Tu es un expert-comptable spécialisé en immobilier locatif québécois. Analyse ce document (facture, reçu, relevé) et extrais toutes les informations comptables.
+  const sysDep=`Tu es un expert-comptable spécialisé en immobilier locatif québécois. Analyse ce document (facture, reçu de caisse, relevé) et extrais toutes les informations comptables.
+
+RECONNAISSANCE DES REÇUS DE CAISSE QUÉBÉCOIS :
+Les reçus de quincaillerie québécois (Canac, Rona, etc.) ont ce format typique :
+- En-tête : nom du magasin, adresse, téléphone, numéros TPS/TVQ
+- Articles : code produit, description, quantité × prix unitaire = total
+- Sous-total, puis TPS @ 5% et TVQ @ 9.975% séparément
+- TOTAL final
+- Section paiement : mode de paiement, montant, date/heure, numéro de transaction
+La DATE se trouve souvent en bas du reçu dans la section paiement (format JJ/MM/AA ou AAAA-MM-JJ).
+Le SOUS-TOTAL (avant taxes) = montant_ht. TPS + TVQ séparément = tps_tvq au total.
 
 RÈGLES DE CLASSIFICATION — choisis la catégorie la plus précise :
 
-"Entretien & réparations" → toute facture de travaux, réparations ou maintenance : plombier, électricien, serrurier, vitrier, peintre, couvreur, menuisier, chauffagiste, réparation d'électroménager, nettoyage de conduits, déglaçage, débouchage, remplacement de pièces (robinets, serrures, fenêtres, portes, planchers, céramique, gypse, toiture partielle), toute main-d'œuvre de réparation. RÈGLE ABSOLUE : toute facture dont le fournisseur est "Canac", "Canac-Marquis", "Rona", "Home Depot", "Home Hardware", "BMR", "Patrick Morin", "Réno-Dépôt" ou tout autre magasin de matériaux de construction/quincaillerie doit TOUJOURS être classée dans "Entretien & réparations", sans exception.
+"Entretien & réparations" → RÈGLE ABSOLUE : toute facture dont le fournisseur est "Canac", "Canac-Marquis", "Rona", "Home Depot", "Home Hardware", "BMR", "Patrick Morin", "Réno-Dépôt", "Château d'eau", ou tout autre magasin de matériaux/quincaillerie = TOUJOURS "Entretien & réparations" sans exception. Aussi : plombier, électricien, serrurier, vitrier, peintre, couvreur, menuisier, chauffagiste, réparation électroménager, nettoyage conduits, déglaçage, débouchage, remplacement pièces (robinets, serrures, fenêtres, portes, planchers, céramique, gypse, toiture partielle).
 
-"Améliorations" → travaux qui augmentent la valeur ou prolongent la durée de vie : rénovation majeure, agrandissement, nouvelle cuisine complète, nouvelle salle de bain complète, remplacement système de chauffage complet, imperméabilisation fondation, toiture complète neuve.
+"Améliorations" → travaux qui augmentent la valeur : rénovation majeure, agrandissement, nouvelle cuisine complète, nouvelle salle de bain complète, remplacement système chauffage complet, imperméabilisation fondation, toiture complète neuve.
 
 "Hypothèque / Intérêts" → paiement hypothécaire, intérêts bancaires, relevé hypothécaire.
 
-"Taxes municipales" → taxes foncières, compte de taxes, évaluation municipale.
+"Taxes municipales" → taxes foncières, compte de taxes, taxe scolaire, évaluation municipale.
 
-"Assurances" → prime d'assurance habitation, assurance propriétaire, assurance responsabilité.
+"Assurances" → prime assurance habitation, assurance propriétaire, assurance responsabilité civile.
 
-"Services publics" → Hydro-Québec, Énergir (gaz naturel), eau, internet, câble (si payé par propriétaire).
+"Services publics" → Hydro-Québec, Énergir, gaz naturel, eau, internet, câble (si payé par propriétaire).
 
-"Frais de gestion" → honoraires d'un gestionnaire immobilier, frais d'administration, frais bancaires liés à l'immeuble.
+"Frais de gestion" → honoraires gestionnaire immobilier, frais administration, frais bancaires liés à l'immeuble.
 
 "Déneigement / Aménagement" → déneigement, pelouse, taille haies, entretien extérieur saisonnier.
 
-"Honoraires professionnels" → notaire, avocat, comptable, arpenteur, inspecteur en bâtiment.
+"Honoraires professionnels" → notaire, avocat, comptable, arpenteur, inspecteur bâtiment.
 
-"Publicité" → annonces Centris, Kijiji, panneaux À LOUER, photos professionnelles pour location.
-
-"Taxes municipales" → compte de taxes, taxe foncière, taxe scolaire.
+"Publicité" → annonces Centris, Kijiji, panneaux À LOUER, photos professionnelles location.
 
 "Autres" → uniquement si aucune autre catégorie ne correspond.
 
 Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
-{"date":"YYYY-MM-DD","description":"description courte et précise de la dépense","fournisseur":"nom exact du fournisseur/entreprise","categorie":"catégorie choisie","montant_ht":0.00,"tps_tvq":0.00,"total_ttc":0.00,"notes":"détails utiles (numéro facture, travaux effectués, etc.)","conf_date":0.95,"conf_mont":0.95,"conf_four":0.90,"conf_tax":0.85,"raison_categorie":"explication en 1 phrase pourquoi cette catégorie"}
+{"date":"YYYY-MM-DD","description":"description courte et précise des articles achetés","fournisseur":"nom exact du magasin/fournisseur avec succursale si visible","categorie":"catégorie choisie","montant_ht":0.00,"tps_tvq":0.00,"total_ttc":0.00,"notes":"liste des principaux articles achetés","conf_date":0.95,"conf_mont":0.95,"conf_four":0.90,"conf_tax":0.85,"raison_categorie":"explication en 1 phrase pourquoi cette catégorie"}
 
-Si une valeur est absente du document: null. Montants en dollars canadiens (CAD). Date format YYYY-MM-DD.`;
+IMPORTANT : Pour les reçus Canac/quincaillerie, la description doit lister les principaux articles (ex: "Plinthe, tuiles, gypse, genouillères — Canac Saint-Nicolas"). Montants en CAD. Date format YYYY-MM-DD.`;
 
   const sysRev=`Tu es un expert-comptable spécialisé en immobilier locatif québécois. Analyse ce document (preuve de paiement, virement, chèque, reçu de loyer).
 
@@ -1914,6 +1922,117 @@ function genPDF(type){
   };
   toast('📄 Rapport généré — utilisez Imprimer → Enregistrer en PDF', 'ok');
 }
+
+// ══════════════════════════════════════════════════
+// RAPPORT PDF — ÉTAT DES RÉSULTATS
+// ══════════════════════════════════════════════════
+function genResPDF(){
+  const imm=activeImm();if(!imm){toast('Aucun immeuble actif','err');return;}
+  const annee=imm.year||new Date().getFullYear();
+  const deps=imm.depenses||[];
+  const revs=imm.revenus||[];
+  const totDep=deps.reduce((s,d)=>s+(d.montant||0)+(d.tax||0),0);
+  const totRev=revs.reduce((s,r)=>s+(r.montant||0),0);
+  const net=totRev-totDep;
+  const rend=totRev>0?((net/totRev)*100).toFixed(1)+'%':'—';
+  const depByCat={},revByCat={};
+  const DEP_CATS=['Hypothèque / Intérêts','Taxes municipales','Assurances','Entretien & réparations','Frais de gestion','Services publics','Déneigement / Aménagement','Honoraires professionnels','Publicité','Améliorations','Autres'];
+  const REV_CATS=['Loyer mensuel','Stationnement','Buanderie','Dépôt de garantie','Subvention','Remboursement assurance','Autres revenus'];
+  DEP_CATS.forEach(c=>depByCat[c]=0);REV_CATS.forEach(c=>revByCat[c]=0);
+  deps.forEach(d=>{const k=d.cat||'Autres';depByCat[k]=(depByCat[k]||0)+(d.montant||0)+(d.tax||0);});
+  revs.forEach(r=>{const k=r.cat||'Autres revenus';revByCat[k]=(revByCat[k]||0)+(r.montant||0);});
+  const months=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const monthly=months.map((m,i)=>{
+    const mm=String(i+1).padStart(2,'0');
+    const mDep=deps.filter(d=>d.date&&d.date.slice(5,7)===mm).reduce((s,d)=>s+(d.montant||0)+(d.tax||0),0);
+    const mRev=revs.filter(r=>r.date&&r.date.slice(5,7)===mm).reduce((s,r)=>s+(r.montant||0),0);
+    return {m,mDep,mRev,net:mRev-mDep};
+  });
+
+  const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+  <title>État des résultats — ${imm.name} ${annee}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a2e}
+    .cover{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1a1a2e;color:#fff;text-align:center;page-break-after:always}
+    .cover-logo{font-size:2.5rem;font-weight:700;margin-bottom:.5rem}
+    .cover-logo span{color:#34a367}
+    .kpi-row{display:flex;gap:1.5rem;justify-content:center;margin-top:2rem;flex-wrap:wrap}
+    .kpi{background:rgba(255,255,255,.1);border-radius:10px;padding:1rem 1.5rem;text-align:center;min-width:140px}
+    .kpi .val{font-size:1.3rem;font-weight:700}.kpi .lbl{font-size:11px;opacity:.6;margin-top:4px}
+    .page{padding:2rem;page-break-after:always}.page:last-child{page-break-after:auto}
+    .page-title{font-size:1.1rem;font-weight:700;color:#1a1a2e;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:2px solid #1a1a2e;display:flex;justify-content:space-between;align-items:center}
+    table{width:100%;border-collapse:collapse;margin-bottom:1.5rem}
+    th{background:#1a1a2e;color:#fff;padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    th.r{text-align:right}
+    td{padding:8px 12px;border-bottom:1px solid #e4e2da;font-size:12px}
+    td.r{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+    tr:nth-child(even) td{background:#f8f7f3}
+    .sec-header td{background:#f2f1ed!important;font-weight:700;font-size:11px;color:#4a4a6a;text-transform:uppercase;letter-spacing:.05em;padding:5px 12px}
+    .total-dep td{background:#fee2e2!important;font-weight:700;color:#b91c1c}
+    .total-rev td{background:#dff2e9!important;font-weight:700;color:#1e6b47}
+    .net-row td{background:#1a1a2e!important;color:#fff;font-weight:700;font-size:14px;padding:10px 12px}
+    .net-row td.pos{color:#6ee7b7}.net-row td.neg{color:#fca5a5}
+    .pct{font-size:11px;color:#9090b0;font-weight:400}
+    .footer{text-align:center;font-size:10px;color:#9090b0;margin-top:1.5rem;padding-top:.75rem;border-top:1px solid #e4e2da}
+    .sign-section{margin-top:3rem;display:grid;grid-template-columns:1fr 1fr;gap:3rem}
+    .sign-box{border-top:1px solid #1a1a2e;padding-top:.5rem;font-size:11px;color:#4a4a6a}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+  </style></head><body>
+  <div class="cover">
+    <div class="cover-logo">Immo<span>Compta</span></div>
+    <div style="font-size:13px;opacity:.5;margin-bottom:2rem">Rapport comptable officiel</div>
+    <div style="font-size:1.6rem;font-weight:700;margin-bottom:.5rem">État des résultats</div>
+    <div style="font-size:1.1rem;opacity:.7">${imm.name}${imm.addr?' · '+imm.addr:''}</div>
+    <div style="font-size:1rem;opacity:.5;margin-top:.25rem">Exercice financier ${annee}</div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="val" style="color:#34a367">${fmt(totRev)}</div><div class="lbl">Revenus totaux</div></div>
+      <div class="kpi"><div class="val" style="color:#e05252">${fmt(totDep)}</div><div class="lbl">Dépenses totales</div></div>
+      <div class="kpi"><div class="val" style="color:${net>=0?'#34a367':'#e05252'}">${fmt(net)}</div><div class="lbl">Résultat net</div></div>
+      <div class="kpi"><div class="val">${rend}</div><div class="lbl">Rendement net</div></div>
+    </div>
+    <div style="margin-top:3rem;font-size:11px;opacity:.3">Généré le ${new Date().toLocaleDateString('fr-CA')} · ImmoCompta Pro</div>
+  </div>
+  <div class="page">
+    <div class="page-title"><span>📊 État des résultats complet</span><span style="font-size:12px;font-weight:400;color:#9090b0">${imm.name} · ${annee}</span></div>
+    <table>
+      <thead><tr><th>Poste</th><th class="r">Montant (CAD)</th><th class="r">%</th></tr></thead>
+      <tbody>
+        <tr class="sec-header"><td colspan="3">💰 REVENUS</td></tr>
+        ${REV_CATS.map(cat=>{const v=revByCat[cat]||0;if(!v)return '';return `<tr><td style="padding-left:1.5rem">${cat}</td><td class="r" style="color:#1e6b47">${fmt(v)}</td><td class="r pct">${totRev?((v/totRev)*100).toFixed(1)+'%':''}</td></tr>`;}).join('')}
+        <tr class="total-rev"><td>TOTAL REVENUS</td><td class="r">${fmt(totRev)}</td><td class="r">100%</td></tr>
+        <tr><td colspan="3" style="padding:6px"></td></tr>
+        <tr class="sec-header"><td colspan="3">📋 DÉPENSES</td></tr>
+        ${DEP_CATS.map(cat=>{const v=depByCat[cat]||0;if(!v)return '';return `<tr><td style="padding-left:1.5rem">${cat}</td><td class="r" style="color:#b91c1c">${fmt(v)}</td><td class="r pct">${totDep?((v/totDep)*100).toFixed(1)+'%':''}</td></tr>`;}).join('')}
+        <tr class="total-dep"><td>TOTAL DÉPENSES (TTC)</td><td class="r">${fmt(totDep)}</td><td class="r">100%</td></tr>
+        <tr class="net-row"><td>RÉSULTAT NET</td><td class="r ${net>=0?'pos':'neg'}">${fmt(net)}</td><td class="r">${rend}</td></tr>
+      </tbody>
+    </table>
+    <div class="sign-section">
+      <div class="sign-box">Signature du propriétaire<br><br><br>_______________________<br><span style="font-size:10px">Date : _______________</span></div>
+      <div class="sign-box">Vérifié par<br><br><br>_______________________<br><span style="font-size:10px">Date : _______________</span></div>
+    </div>
+    <div class="footer">${imm.name} · État des résultats ${annee} · ImmoCompta Pro · Généré le ${new Date().toLocaleDateString('fr-CA')}</div>
+  </div>
+  <div class="page">
+    <div class="page-title"><span>📅 Analyse mensuelle</span><span style="font-size:12px;font-weight:400;color:#9090b0">${annee}</span></div>
+    <table>
+      <thead><tr><th>Mois</th><th class="r">Revenus</th><th class="r">Dépenses</th><th class="r">Résultat net</th></tr></thead>
+      <tbody>
+        ${monthly.map(row=>`<tr><td>${row.m}</td><td class="r" style="color:${row.mRev?'#1e6b47':'#9090b0'}">${row.mRev?fmt(row.mRev):'—'}</td><td class="r" style="color:${row.mDep?'#b91c1c':'#9090b0'}">${row.mDep?fmt(row.mDep):'—'}</td><td class="r" style="color:${row.net>0?'#1e6b47':row.net<0?'#b91c1c':'#9090b0'};font-weight:700">${(row.mRev||row.mDep)?fmt(row.net):'—'}</td></tr>`).join('')}
+        <tr class="net-row"><td>TOTAL ANNUEL</td><td class="r pos">${fmt(totRev)}</td><td class="r neg">${fmt(totDep)}</td><td class="r ${net>=0?'pos':'neg'}">${fmt(net)}</td></tr>
+      </tbody>
+    </table>
+    <div class="footer">${imm.name} · État des résultats ${annee} · ImmoCompta Pro</div>
+  </div>
+  </body></html>`;
+
+  const win=window.open('','_blank');
+  win.document.write(html);win.document.close();
+  win.onload=()=>setTimeout(()=>win.print(),500);
+  toast('📄 État des résultats généré — Enregistrer en PDF','ok');
+}
+
 const DEFAULT_PW = 'immo2025';
 function hashPw(pw){ let h=0;for(let i=0;i<pw.length;i++){h=((h<<5)-h)+pw.charCodeAt(i);h|=0;}return String(h); }
 function checkPw(){
