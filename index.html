@@ -1351,8 +1351,18 @@ Réponds UNIQUEMENT en JSON valide, sans texte ni backticks :
 Si absent: null. Montants en CAD.`;
 
   try{
+    // Clean the API key — remove any non-ASCII characters
+    const cleanKey = getApiKey().replace(/[^\x20-\x7E]/g, '').trim();
+    if(!cleanKey.startsWith('sk-')){
+      throw new Error('Clé API invalide');
+    }
     const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':getApiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': cleanKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:type==='dep'?sysDep:sysRev,
         messages:[{role:'user',content:[
           {type:isPdf?'document':'image',source:{type:'base64',media_type:file.type,data:b64}},
@@ -1538,10 +1548,14 @@ function dlR(id,type,immId){
 // ══════════════════════════════════════════════════
 // API KEY
 // ══════════════════════════════════════════════════
-function getApiKey(){return localStorage.getItem('ic_key')||''}
+function getApiKey(){
+  const k=localStorage.getItem('ic_key')||'';
+  return k.replace(/[^\x20-\x7E]/g,'').trim();
+}
 function saveKey(){
-  const k=$('api-input').value.trim();
-  if(!k.startsWith('sk-')){toast('Clé invalide','err');return;}
+  const raw=$('api-input').value;
+  const k=raw.replace(/[^\x20-\x7E]/g,'').trim();
+  if(!k.startsWith('sk-')){toast('Clé invalide — doit commencer par sk-','err');return;}
   localStorage.setItem('ic_key',k);
   $('api-status').textContent='✓ Enregistrée';
   $('api-status').style.color='#34a367';
