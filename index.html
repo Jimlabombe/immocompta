@@ -331,6 +331,13 @@ tbody tr:hover{background:var(--surf2)}
 
   <div class="rail-spacer"></div>
   <div class="rail-footer">
+    <div class="drive-mini" style="margin-top:.5rem">
+      <strong>🔥 Firebase (temps réel)</strong>
+      <div class="drive-status">
+        <div class="drive-dot" id="fb-dot" style="background:#d97706"></div>
+        <span id="fb-status" style="font-size:11px;color:rgba(255,255,255,.5)">Connexion…</span>
+      </div>
+    </div>
     <div class="drive-mini">
       <strong>☁️ Google Drive</strong>
       <div class="drive-status">
@@ -640,6 +647,53 @@ tbody tr:hover{background:var(--surf2)}
 <div class="lb" id="lb" onclick="closeLB()"><button class="lb-close" onclick="closeLB()">×</button><img id="lb-img"><div class="lb-cap" id="lb-cap"></div></div>
 <div class="toasts" id="toasts"></div>
 
+<!-- ══ FIREBASE ══ -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDKDP9oC-APHg_0mx2idWmHri7aNCu4QVw",
+  authDomain: "immocompta-786e4.firebaseapp.com",
+  projectId: "immocompta-786e4",
+  storageBucket: "immocompta-786e4.firebasestorage.app",
+  messagingSenderId: "841232851097",
+  appId: "1:841232851097:web:67a680b041073c89ca1808"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+// Expose Firebase functions to global scope
+window._fbDb = db;
+window._fbDoc = doc;
+window._fbSetDoc = setDoc;
+window._fbOnSnapshot = onSnapshot;
+window._fbGetDoc = getDoc;
+window._fbReady = true;
+
+// Listen for real-time changes from other users
+const dataRef = doc(db, 'immocompta', 'shared');
+onSnapshot(dataRef, (snap) => {
+  if(!snap.exists()) return;
+  const data = snap.data();
+  // Only update if the change came from another device
+  if(data._lastDevice && data._lastDevice !== window._deviceId) {
+    if(typeof window.immeubles !== 'undefined' && data.immeubles) {
+      window.immeubles = data.immeubles;
+      localStorage.setItem('ic_imm', JSON.stringify(data.immeubles));
+      if(typeof renderRail === 'function') {
+        renderRail();
+        // Show notification
+        if(typeof toast === 'function') toast('🔄 Données mises à jour par un autre utilisateur', 'ok');
+      }
+    }
+  }
+});
+
+console.log('Firebase connecté ✅');
+</script>
+
 <script>
 // ══════════════════════════════════════════════════
 // STATE
@@ -649,6 +703,13 @@ let activeImmId = null;
 let scanQueue = [], scanIdx = 0, scanType = 'dep';
 let curScanData = null, curScanFile = null;
 let editId = null, manType = null;
+
+// Unique device ID for detecting changes from other users
+window._deviceId = localStorage.getItem('ic_device_id') || (()=>{
+  const id = Math.random().toString(36).slice(2);
+  localStorage.setItem('ic_device_id', id);
+  return id;
+})();
 
 const BAIL_MONTHS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
 let selectedMonths = new Set([1,2,3,4,5,6,7,8,9,10,11,12]);
@@ -660,7 +721,73 @@ const IMM_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899',
 const $ = id => document.getElementById(id);
 const fmt = n => new Intl.NumberFormat('fr-CA',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0)+'\u00a0$';
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-function save(){ localStorage.setItem('ic_imm', JSON.stringify(immeubles)); if(typeof driveToken!=='undefined'&&driveToken){clearTimeout(window._driveSaveTimer);window._driveSaveTimer=setTimeout(driveSaveData,3000);} }
+
+function save(){
+  localStorage.setItem('ic_imm', JSON.stringify(immeubles));
+  // Sync to Firebase
+  fbSave();
+  // Sync to Drive if connected
+  if(typeof driveToken!=='undefined'&&driveToken){
+    clearTimeout(window._driveSaveTimer);
+    window._driveSaveTimer=setTimeout(driveSaveData,3000);
+  }
+}
+
+// Firebase save with debounce
+let _fbSaveTimer = null;
+function fbSave(){
+  clearTimeout(_fbSaveTimer);
+  _fbSaveTimer = setTimeout(async ()=>{
+    if(!window._fbReady) return;
+    try{
+      await window._fbSetDoc(
+        window._fbDoc(window._fbDb, 'immocompta', 'shared'),
+        { immeubles: immeubles, _lastDevice: window._deviceId, _saved: new Date().toISOString() }
+      );
+      // Update sync indicator
+      const dot = $('fb-dot');
+      const txt = $('fb-status');
+      if(dot) dot.style.background = '#34a367';
+      if(txt) txt.textContent = 'Synchronisé ✓';
+      setTimeout(()=>{ if(txt) txt.textContent = 'Firebase actif'; }, 3000);
+    } catch(err){
+      console.error('Firebase save error:', err);
+      const dot = $('fb-dot');
+      if(dot) dot.style.background = '#dc3545';
+    }
+  }, 2000);
+}
+
+// Load from Firebase on startup
+async function fbLoad(){
+  if(!window._fbReady){ setTimeout(fbLoad, 500); return; }
+  try{
+    const snap = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta', 'shared'));
+    if(snap.exists()){
+      const data = snap.data();
+      if(data.immeubles && data.immeubles.length > 0){
+        // Use Firebase data if it's newer or local is empty
+        const localEmpty = !immeubles.length;
+        if(localEmpty){
+          immeubles = data.immeubles;
+          localStorage.setItem('ic_imm', JSON.stringify(immeubles));
+          activeImmId = immeubles[0]?.id || null;
+          renderRail();
+          showPanel('global');
+          toast('☁ Données chargées depuis Firebase', 'ok');
+        }
+      }
+    }
+    // Show Firebase status
+    const dot = $('fb-dot');
+    const txt = $('fb-status');
+    if(dot) dot.style.background = '#34a367';
+    if(txt) txt.textContent = 'Firebase actif';
+  } catch(err){
+    console.error('Firebase load error:', err);
+  }
+}
+
 const getImm = id => immeubles.find(x=>x.id===id);
 const activeImm = () => getImm(activeImmId);
 
@@ -1626,6 +1753,8 @@ function checkPw(){
     $('pw-screen').style.display='none';
     $('app-shell').style.display='flex';
     renderRail();showPanel('global');
+    // Load Firebase data after login
+    setTimeout(fbLoad, 1000);
   }else{
     $('pw-error').textContent='Mot de passe incorrect';
     $('pw-input').classList.add('shake');
