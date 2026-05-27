@@ -287,23 +287,26 @@ tbody tr:hover{background:var(--surf2)}
 </head>
 <body>
 
-<!-- ══ ÉCRAN MOT DE PASSE ══ -->
-<div class="pw-screen" id="pw-screen">
-  <div class="pw-box">
-    <div class="pw-logo">Immo<span>Compta</span></div>
-    <div class="pw-sub">Comptabilité immobilière privée</div>
-    <input type="password" id="pw-input" placeholder="Mot de passe" maxlength="30"
-      onkeydown="if(event.key==='Enter')checkPw()"
-      oninput="$('pw-error').textContent=''">
-    <button onclick="checkPw()">Entrer →</button>
-    <div class="pw-error" id="pw-error"></div>
-    <div class="pw-hint">Première utilisation? Le mot de passe par défaut est <strong>immo2025</strong></div>
-    <span class="pw-change" onclick="showChangePw()">Changer mon mot de passe</span>
-    <div id="pw-change-area" style="display:none;margin-top:.875rem;text-align:left">
-      <div style="font-size:12px;color:var(--ink2);margin-bottom:.375rem">Nouveau mot de passe :</div>
-      <input type="password" id="pw-new" placeholder="Nouveau mot de passe" maxlength="30" style="margin-bottom:.375rem">
-      <input type="password" id="pw-new2" placeholder="Confirmer" maxlength="30" style="margin-bottom:.5rem">
-      <button onclick="savePw()" style="background:var(--grn)">Enregistrer</button>
+<!-- ══ ÉCRAN CONNEXION GOOGLE ══ -->
+<div id="login-screen" style="position:fixed;inset:0;background:#1a1a2e;z-index:9999;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;padding:2.5rem;width:380px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="font-family:'DM Serif Display',serif;font-size:2rem;color:#1a1a2e;margin-bottom:.25rem">Immo<span style="color:#34a367;font-style:italic">Compta</span></div>
+    <div style="font-size:13px;color:#9090b0;margin-bottom:2rem">Comptabilité immobilière sécurisée</div>
+
+    <div style="background:#f2f1ed;border-radius:10px;padding:1rem;margin-bottom:1.5rem;font-size:13px;color:#4a4a6a;text-align:left">
+      🔐 Accès réservé aux partenaires autorisés.<br>Connectez-vous avec votre compte Google.
+    </div>
+
+    <button onclick="googleSignIn()" style="width:100%;padding:12px;background:#fff;border:2px solid #e4e2da;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:.2s;color:#1a1a2e" onmouseover="this.style.borderColor='#1a1a2e'" onmouseout="this.style.borderColor='#e4e2da'">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Se connecter avec Google
+    </button>
+
+    <div id="login-error" style="color:#b91c1c;font-size:13px;margin-top:.75rem;min-height:20px"></div>
+    <div id="login-loading" style="display:none;color:#9090b0;font-size:13px;margin-top:.75rem">Connexion en cours…</div>
+
+    <div style="margin-top:1.5rem;font-size:11px;color:#9090b0">
+      Seuls les comptes autorisés ont accès.<br>Contactez Jim pour obtenir l'accès.
     </div>
   </div>
 </div>
@@ -335,8 +338,13 @@ tbody tr:hover{background:var(--surf2)}
       <strong>🔥 Firebase (temps réel)</strong>
       <div class="drive-status">
         <div class="drive-dot" id="fb-dot" style="background:#d97706"></div>
-        <span id="fb-status" style="font-size:11px;color:rgba(255,255,255,.5)">Connexion…</span>
+        <span id="fb-status" style="font-size:10px;color:rgba(255,255,255,.5)">Connexion…</span>
       </div>
+      <div id="user-info" style="margin-top:5px;display:flex;align-items:center;gap:6px">
+        <img id="user-avatar" src="" style="width:22px;height:22px;border-radius:99px;display:none">
+        <span id="user-email" style="font-size:10px;color:rgba(255,255,255,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px"></span>
+      </div>
+      <button onclick="googleSignOut()" style="width:100%;margin-top:4px;background:rgba(220,53,69,.2);border:none;border-radius:4px;padding:4px;font-size:10px;color:#fca5a5;cursor:pointer;font-family:'DM Sans',sans-serif">Se déconnecter</button>
     </div>
     <div class="drive-mini">
       <strong>☁️ Google Drive</strong>
@@ -651,6 +659,7 @@ tbody tr:hover{background:var(--surf2)}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDKDP9oC-APHg_0mx2idWmHri7aNCu4QVw",
@@ -661,37 +670,102 @@ const firebaseConfig = {
   appId: "1:841232851097:web:67a680b041073c89ca1808"
 };
 
+const ALLOWED_EMAILS = [
+  'jimlabombe@hotmail.com',
+  'jccaronrs18@gmail.com',
+  'aboutin2k1@gmail.com'
+];
+
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const provider = new GoogleAuthProvider();
 
-// Expose Firebase functions to global scope
+// Expose to global scope
 window._fbDb = db;
 window._fbDoc = doc;
 window._fbSetDoc = setDoc;
 window._fbOnSnapshot = onSnapshot;
 window._fbGetDoc = getDoc;
-window._fbReady = true;
+window._fbReady = false;
+window._fbAuth = auth;
+window._fbSignIn = async () => {
+  try {
+    const result = await signInWithPopup(auth, provider);
+    return result.user;
+  } catch(err) {
+    console.error('Sign-in error:', err);
+    throw err;
+  }
+};
+window._fbSignOut = () => signOut(auth);
 
-// Listen for real-time changes from other users
-const dataRef = doc(db, 'immocompta', 'shared');
-onSnapshot(dataRef, (snap) => {
-  if(!snap.exists()) return;
-  const data = snap.data();
-  // Only update if the change came from another device
-  if(data._lastDevice && data._lastDevice !== window._deviceId) {
-    if(typeof window.immeubles !== 'undefined' && data.immeubles) {
-      window.immeubles = data.immeubles;
-      localStorage.setItem('ic_imm', JSON.stringify(data.immeubles));
-      if(typeof renderRail === 'function') {
-        renderRail();
-        // Show notification
-        if(typeof toast === 'function') toast('🔄 Données mises à jour par un autre utilisateur', 'ok');
+// Auth state listener
+onAuthStateChanged(auth, (user) => {
+  if(user && ALLOWED_EMAILS.includes(user.email)) {
+    // Authorized user
+    window._fbCurrentUser = user;
+    window._fbReady = true;
+
+    // Hide login screen, show app
+    const loginScreen = document.getElementById('login-screen');
+    const appShell = document.getElementById('app-shell');
+    const pwScreen = document.getElementById('pw-screen');
+    if(loginScreen) loginScreen.style.display = 'none';
+    if(pwScreen) pwScreen.style.display = 'none';
+    if(appShell) appShell.style.display = 'flex';
+
+    // Update user info in UI
+    const userEmail = document.getElementById('user-email');
+    const userAvatar = document.getElementById('user-avatar');
+    if(userEmail) userEmail.textContent = user.email;
+    if(userAvatar && user.photoURL) userAvatar.src = user.photoURL;
+
+    // Init app
+    if(typeof renderRail === 'function') { renderRail(); }
+    if(typeof showPanel === 'function') { showPanel('global'); }
+    if(typeof fbLoad === 'function') { setTimeout(fbLoad, 500); }
+
+    // Start real-time listener
+    const dataRef = doc(db, 'immocompta', 'shared');
+    onSnapshot(dataRef, (snap) => {
+      if(!snap.exists()) return;
+      const data = snap.data();
+      if(data._lastDevice && data._lastDevice !== window._deviceId) {
+        if(typeof window.immeubles !== 'undefined' && data.immeubles) {
+          window.immeubles = data.immeubles;
+          localStorage.setItem('ic_imm', JSON.stringify(data.immeubles));
+          if(typeof renderRail === 'function') renderRail();
+          if(typeof toast === 'function') toast('🔄 Données mises à jour', 'ok');
+        }
       }
-    }
+    });
+
+    // Update Firebase status dot
+    const dot = document.getElementById('fb-dot');
+    const txt = document.getElementById('fb-status');
+    if(dot) dot.style.background = '#34a367';
+    if(txt) txt.textContent = user.email;
+
+  } else if(user && !ALLOWED_EMAILS.includes(user.email)) {
+    // Not authorized
+    signOut(auth);
+    const errEl = document.getElementById('login-error');
+    if(errEl) errEl.textContent = '❌ Accès refusé — ' + user.email + ' n\'est pas autorisé.';
+  } else {
+    // Not logged in — show login screen
+    window._fbCurrentUser = null;
+    window._fbReady = false;
+    const loginScreen = document.getElementById('login-screen');
+    const appShell = document.getElementById('app-shell');
+    const pwScreen = document.getElementById('pw-screen');
+    if(loginScreen) loginScreen.style.display = 'flex';
+    if(pwScreen) pwScreen.style.display = 'none';
+    if(appShell) appShell.style.display = 'none';
   }
 });
 
-console.log('Firebase connecté ✅');
+console.log('Firebase Auth prêt ✅');
 </script>
 
 <script>
@@ -2047,43 +2121,34 @@ function genResPDF(){
   toast('📄 État des résultats généré — Enregistrer en PDF','ok');
 }
 
-const DEFAULT_PW = 'immo2025';
-function hashPw(pw){ let h=0;for(let i=0;i<pw.length;i++){h=((h<<5)-h)+pw.charCodeAt(i);h|=0;}return String(h); }
-function checkPw(){
-  const input=$('pw-input').value;
-  const stored=localStorage.getItem('ic_pw')||hashPw(DEFAULT_PW);
-  if(hashPw(input)===stored){
-    $('pw-screen').style.display='none';
-    $('app-shell').style.display='flex';
-    renderRail();showPanel('global');
-    // Load Firebase data after login
-    setTimeout(fbLoad, 1000);
-  }else{
-    $('pw-error').textContent='Mot de passe incorrect';
-    $('pw-input').classList.add('shake');
-    setTimeout(()=>$('pw-input').classList.remove('shake'),400);
-    $('pw-input').value='';
+// ══════════════════════════════════════════════════
+// GOOGLE AUTH
+// ══════════════════════════════════════════════════
+async function googleSignIn(){
+  const errEl=$('login-error');
+  const loadEl=$('login-loading');
+  if(errEl)errEl.textContent='';
+  if(loadEl)loadEl.style.display='block';
+  try{
+    if(!window._fbSignIn){setTimeout(googleSignIn,500);return;}
+    await window._fbSignIn();
+  }catch(err){
+    if(loadEl)loadEl.style.display='none';
+    if(errEl)errEl.textContent='Erreur de connexion — réessayez';
+    console.error(err);
   }
 }
-function showChangePw(){
-  const area=$('pw-change-area');
-  area.style.display=area.style.display==='none'?'block':'none';
-}
-function savePw(){
-  const n1=$('pw-new').value, n2=$('pw-new2').value;
-  if(!n1||n1.length<4){$('pw-error').textContent='Minimum 4 caractères';return;}
-  if(n1!==n2){$('pw-error').textContent='Les mots de passe ne correspondent pas';return;}
-  localStorage.setItem('ic_pw',hashPw(n1));
-  $('pw-error').textContent='';
-  $('pw-change-area').style.display='none';
-  alert('Mot de passe changé! Utilisez-le à votre prochaine connexion.');
+async function googleSignOut(){
+  if(!confirm('Se déconnecter?'))return;
+  if(window._fbSignOut)await window._fbSignOut();
 }
 
 // ══════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════
 driveUpdateUI();
-// Ne pas init l'app avant que le mot de passe soit entré
+// App initialized by Firebase Auth state listener
+
 
 </script>
 </body>
