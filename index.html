@@ -455,6 +455,14 @@ tbody tr:hover{background:var(--surf2)}
       <span class="topbar-title" id="topbar-title">Tous les immeubles</span>
       <span class="topbar-sub" id="topbar-sub"></span>
     </div>
+    <!-- SÉLECTEUR D'ANNÉE -->
+    <div style="display:flex;align-items:center;gap:8px;margin:0 auto">
+      <button onclick="changeYear(-1)" style="background:var(--surf2);border:1px solid var(--bdr2);border-radius:var(--rs);width:28px;height:28px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--ink2)" title="Année précédente">‹</button>
+      <div style="background:var(--ink);color:#fff;border-radius:var(--rs);padding:4px 16px;font-weight:600;font-size:15px;min-width:70px;text-align:center;cursor:pointer" id="year-display" onclick="openYearPicker()">2026</div>
+      <button onclick="changeYear(1)" style="background:var(--surf2);border:1px solid var(--bdr2);border-radius:var(--rs);width:28px;height:28px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--ink2)" title="Année suivante">›</button>
+      <!-- Year picker dropdown -->
+      <div id="year-picker" style="display:none;position:absolute;top:52px;left:50%;transform:translateX(-50%);background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--shl);z-index:100;padding:.5rem;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:200px"></div>
+    </div>
     <div class="topbar-right" id="topbar-actions"></div>
   </div>
   <div class="content">
@@ -796,6 +804,59 @@ const $ = id => document.getElementById(id);
 const fmt = n => new Intl.NumberFormat('fr-CA',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0)+'\u00a0$';
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
+// ── ANNÉE ACTIVE ──
+let activeYear = parseInt(localStorage.getItem('ic_year')) || 2026;
+const START_YEAR = 2026;
+const END_YEAR = 2035;
+
+function updateYearDisplay(){
+  const el=$('year-display');
+  if(el) el.textContent = activeYear;
+}
+
+function changeYear(delta){
+  const newYear = activeYear + delta;
+  if(newYear < START_YEAR || newYear > END_YEAR) return;
+  activeYear = newYear;
+  localStorage.setItem('ic_year', activeYear);
+  updateYearDisplay();
+  // Re-render active panel
+  const active = document.querySelector('.panel.active');
+  if(active){ const id=active.id.replace('panel-',''); showPanel(id); }
+  closeYearPicker();
+}
+
+function openYearPicker(){
+  const picker=$('year-picker');
+  if(!picker) return;
+  if(picker.style.display==='grid'){ closeYearPicker(); return; }
+  picker.innerHTML='';
+  for(let y=START_YEAR;y<=END_YEAR;y++){
+    const btn=document.createElement('button');
+    btn.textContent=y;
+    btn.style.cssText=`padding:6px;border-radius:6px;border:1px solid ${y===activeYear?'var(--grn-m)':'var(--bdr)'};background:${y===activeYear?'var(--grn-l)':'var(--surf)'};color:${y===activeYear?'var(--grn)':'var(--ink)'};cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:${y===activeYear?'700':'400'}`;
+    btn.onclick=()=>{ activeYear=y; localStorage.setItem('ic_year',y); updateYearDisplay(); const active=document.querySelector('.panel.active'); if(active){showPanel(active.id.replace('panel-',''));} closeYearPicker(); };
+    picker.appendChild(btn);
+  }
+  picker.style.display='grid';
+  setTimeout(()=>document.addEventListener('click',closeYearPickerOutside),10);
+}
+
+function closeYearPicker(){
+  const picker=$('year-picker');
+  if(picker) picker.style.display='none';
+  document.removeEventListener('click',closeYearPickerOutside);
+}
+
+function closeYearPickerOutside(e){
+  if(!e.target.closest('#year-picker')&&e.target.id!=='year-display') closeYearPicker();
+}
+
+// Filter items by active year
+function filterByYear(items){
+  return items.filter(x => x.date && x.date.startsWith(String(activeYear)));
+}
+
 function save(){
   localStorage.setItem('ic_imm', JSON.stringify(immeubles));
   // Sync to Firebase
@@ -889,7 +950,8 @@ function showPanel(id){
   const titles={global:'Tous les immeubles',factures:'Galerie des factures',dep:'Dépenses',rev:'Revenus',res:'Résultats'};
   $('topbar-title').textContent=titles[id]||'';
   const imm=activeImm();
-  $('topbar-sub').textContent=(id!=='global'&&id!=='factures'&&imm)?'— '+imm.name+' '+imm.year:'';
+  $('topbar-sub').textContent=(id!=='global'&&id!=='factures'&&imm)?'— '+imm.name+' '+activeYear:'';
+  updateYearDisplay();
 
   const actions={
     global:`<button class="btn btn-ink btn-sm" onclick="openAddImm()">+ Immeuble</button>`,
@@ -1031,7 +1093,7 @@ function renderDep(){
   const imm=activeImm();if(!imm)return;
   const s=($('s-dep').value||'').toLowerCase();
   const cat=$('f-dep-cat').value, mois=$('f-dep-mois').value;
-  let rows=[...imm.depenses].filter(d=>{
+  let rows=filterByYear(imm.depenses).filter(d=>{
     return (!s||(d.desc+d.fournisseur+d.cat).toLowerCase().includes(s))&&(!cat||d.cat===cat)&&(!mois||d.date.slice(5,7)===mois);
   }).sort((a,b)=>b.date.localeCompare(a.date));
   const tb=$('tb-dep');
@@ -1065,7 +1127,7 @@ function renderRev(){
   const imm=activeImm();if(!imm)return;
   const s=($('s-rev').value||'').toLowerCase();
   const cat=$('f-rev-cat').value, mois=$('f-rev-mois').value;
-  let rows=[...imm.revenus].filter(r=>{
+  let rows=filterByYear(imm.revenus).filter(r=>{
     return (!s||(r.desc+r.source+r.cat).toLowerCase().includes(s))&&(!cat||r.cat===cat)&&(!mois||r.date.slice(5,7)===mois);
   }).sort((a,b)=>b.date.localeCompare(a.date));
   const tb=$('tb-rev');
@@ -1097,7 +1159,8 @@ const DEP_CATS=['Hypothèque / Intérêts','Taxes municipales','Assurances','Ent
 const REV_CATS=['Loyer mensuel','Stationnement','Buanderie','Dépôt de garantie','Subvention','Remboursement assurance','Autres revenus'];
 
 function calcImm(imm){
-  const deps=imm.depenses||[];const revs=imm.revenus||[];
+  const deps=filterByYear(imm.depenses||[]);
+  const revs=filterByYear(imm.revenus||[]);
   const totDep=deps.reduce((s,d)=>s+(d.montant||0)+(d.tax||0),0);
   const totRev=revs.reduce((s,r)=>s+(r.montant||0),0);
   const byCat=(arr,keyFn,valFn)=>{const r={};arr.forEach(x=>{const k=keyFn(x)||'Autres';r[k]=(r[k]||0)+valFn(x);});return r;};
@@ -1196,8 +1259,8 @@ function renderGallery(){
 
   immeubles.forEach((imm,idx)=>{
     let items=[];
-    if(ft!=='Revenu')(imm.depenses||[]).forEach(d=>{if(d.receipt)items.push({...d,_type:'Dépense',_immId:imm.id});});
-    if(ft!=='Dépense')(imm.revenus||[]).forEach(r=>{if(r.receipt)items.push({...r,_type:'Revenu',_immId:imm.id});});
+    if(ft!=='Revenu')filterByYear(imm.depenses||[]).forEach(d=>{if(d.receipt)items.push({...d,_type:'Dépense',_immId:imm.id});});
+    if(ft!=='Dépense')filterByYear(imm.revenus||[]).forEach(r=>{if(r.receipt)items.push({...r,_type:'Revenu',_immId:imm.id});});
     if(s)items=items.filter(x=>(x.desc||'').toLowerCase().includes(s)||(x.fournisseur||'').toLowerCase().includes(s)||(x.source||'').toLowerCase().includes(s));
     items.sort((a,b)=>b.date.localeCompare(a.date));
     totalCount+=items.length;
@@ -1891,10 +1954,10 @@ function driveDisconnect(){
 function genPDF(type){
   const imm=activeImm();if(!imm){toast('Aucun immeuble actif','err');return;}
   const isDep=type==='dep';
-  const items=isDep?[...imm.depenses]:[...imm.revenus];
+  const items=isDep?filterByYear(imm.depenses):filterByYear(imm.revenus);
   items.sort((a,b)=>a.date.localeCompare(b.date));
   const titre=isDep?'Rapport des dépenses':'Rapport des revenus';
-  const annee=imm.year||new Date().getFullYear();
+  const annee=activeYear;
   const total=isDep
     ?items.reduce((s,d)=>s+(d.montant||0)+(d.tax||0),0)
     :items.reduce((s,r)=>s+(r.montant||0),0);
@@ -2064,9 +2127,9 @@ function genPDF(type){
 // ══════════════════════════════════════════════════
 function genResPDF(){
   const imm=activeImm();if(!imm){toast('Aucun immeuble actif','err');return;}
-  const annee=imm.year||new Date().getFullYear();
-  const deps=imm.depenses||[];
-  const revs=imm.revenus||[];
+  const annee=activeYear;
+  const deps=filterByYear(imm.depenses||[]);
+  const revs=filterByYear(imm.revenus||[]);
   const totDep=deps.reduce((s,d)=>s+(d.montant||0)+(d.tax||0),0);
   const totRev=revs.reduce((s,r)=>s+(r.montant||0),0);
   const net=totRev-totDep;
@@ -2195,6 +2258,7 @@ async function googleSignOut(){
 // INIT
 // ══════════════════════════════════════════════════
 driveUpdateUI();
+updateYearDisplay();
 // App initialized by Firebase Auth state listener
 
 
