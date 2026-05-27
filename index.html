@@ -1363,7 +1363,7 @@ Si absent: null. Montants en CAD.`;
         'anthropic-version':'2023-06-01',
         'anthropic-dangerous-direct-browser-access':'true'
       },
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:type==='dep'?sysDep:sysRev,
+      body:JSON.stringify({model:'claude-3-5-sonnet-20241022',max_tokens:1000,system:type==='dep'?sysDep:sysRev,
         messages:[{role:'user',content:[
           {type:isPdf?'document':'image',source:{type:'base64',media_type:file.type,data:b64}},
           {type:'text',text:'Analyse ce document et extrais toutes les informations comptables selon les règles fournies.'}
