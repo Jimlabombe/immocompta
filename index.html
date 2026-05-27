@@ -916,12 +916,11 @@ function renderRail(){
     <div class="imm-chip ${imm.id===activeImmId?'active':''}" onclick="setActive('${imm.id}')">
       <div class="imm-dot" style="background:${IMM_COLORS[i%8]}"></div>
       <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${imm.name}</span>
+      <button onclick="event.stopPropagation();openEditImm('${imm.id}')" title="Modifier" style="background:transparent;border:none;color:rgba(255,255,255,.4);cursor:pointer;padding:2px 4px;border-radius:4px;font-size:13px;line-height:1;flex-shrink:0" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,.4)'">✏️</button>
     </div>`).join('');
-  // Sync counts
   const imm=activeImm();
   $('cnt-dep').textContent=imm?(imm.depenses||[]).length:0;
   $('cnt-rev').textContent=imm?(imm.revenus||[]).length:0;
-
 }
 
 function setActive(id){
@@ -949,6 +948,55 @@ function saveImm(){
   showPanel('dep');
   toast('Immeuble créé','ok');
   $('imm-name').value='';$('imm-addr').value='';
+}
+
+function openEditImm(id){
+  const imm=getImm(id);if(!imm)return;
+  // Reuse the add modal but prefill it
+  $('imm-name').value=imm.name;
+  $('imm-addr').value=imm.addr||'';
+  $('imm-yr').value=imm.year||2025;
+  $('imm-units').value=imm.units||1;
+  // Change title and button
+  $('ov-imm').querySelector('h2').textContent='Modifier l\'immeuble';
+  $('ov-imm').querySelector('.mf .btn-ink').textContent='✓ Enregistrer';
+  $('ov-imm').querySelector('.mf .btn-ink').onclick=()=>saveEditImm(id);
+  // Add delete button if not already there
+  if(!$('btn-del-imm')){
+    const delBtn=document.createElement('button');
+    delBtn.id='btn-del-imm';
+    delBtn.className='btn btn-red btn-sm';
+    delBtn.textContent='🗑 Supprimer';
+    delBtn.onclick=()=>deleteImm(id);
+    $('ov-imm').querySelector('.mf').prepend(delBtn);
+  } else {
+    $('btn-del-imm').onclick=()=>deleteImm(id);
+  }
+  $('ov-imm').classList.add('open');
+}
+
+function saveEditImm(id){
+  const name=$('imm-name').value.trim();
+  if(!name){toast('Nom requis','err');return;}
+  immeubles=immeubles.map(imm=>imm.id===id?{...imm,name,addr:$('imm-addr').value.trim(),year:parseInt($('imm-yr').value)||2025,units:parseInt($('imm-units').value)||1}:imm);
+  save();renderRail();
+  // Reset modal to "add" mode
+  $('ov-imm').querySelector('h2').textContent='Ajouter un immeuble';
+  $('ov-imm').querySelector('.mf .btn-ink').textContent='✓ Créer';
+  $('ov-imm').querySelector('.mf .btn-ink').onclick=saveImm;
+  closeAddImm();
+  showPanel(document.querySelector('.panel.active')?.id.replace('panel-','')||'global');
+  toast('Immeuble modifié','ok');
+}
+
+function deleteImm(id){
+  const imm=getImm(id);
+  if(!confirm(`Supprimer "${imm?.name}"?\n\n⚠️ Toutes les dépenses, revenus et factures seront perdus.`))return;
+  immeubles=immeubles.filter(x=>x.id!==id);
+  if(activeImmId===id)activeImmId=immeubles[0]?.id||null;
+  save();renderRail();closeAddImm();
+  showPanel('global');
+  toast('Immeuble supprimé');
 }
 
 // ══════════════════════════════════════════════════
