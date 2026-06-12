@@ -668,6 +668,7 @@ tbody tr:hover{background:var(--surf2)}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getStorage, ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDKDP9oC-APHg_0mx2idWmHri7aNCu4QVw",
@@ -688,6 +689,7 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
 const provider = new GoogleAuthProvider();
+const storage = getStorage(fbApp);
 
 // Expose to global scope
 window._fbDb = db;
@@ -697,6 +699,20 @@ window._fbOnSnapshot = onSnapshot;
 window._fbGetDoc = getDoc;
 window._fbReady = false;
 window._fbAuth = auth;
+
+// ── STORAGE FUNCTIONS ──
+window._fbUploadImage = async (path, dataUrl) => {
+  const sRef = storageRef(storage, path);
+  await uploadString(sRef, dataUrl, 'data_url');
+  return await getDownloadURL(sRef);
+};
+window._fbDeleteImage = async (path) => {
+  try {
+    const sRef = storageRef(storage, path);
+    await deleteObject(sRef);
+  } catch(e) { /* ignore if not found */ }
+};
+
 window._fbSignIn = async () => {
   try {
     const result = await signInWithPopup(auth, provider);
@@ -707,6 +723,7 @@ window._fbSignIn = async () => {
   }
 };
 window._fbSignOut = () => signOut(auth);
+
 
 // Auth state listener
 onAuthStateChanged(auth, (user) => {
@@ -809,6 +826,11 @@ let activeYear = parseInt(localStorage.getItem('ic_year')) || 2026;
 const START_YEAR = 2026;
 const END_YEAR = 2035;
 
+// ── DRIVE TOKEN (déclaré ici pour éviter les erreurs de référence) ──
+let driveToken = null;
+let driveFileId = localStorage.getItem('ic_drive_file_id') || null;
+let _driveSaveTimer = null, driveAutoSave = null;
+
 function updateYearDisplay(){
   const el=$('year-display');
   if(el) el.textContent = activeYear;
@@ -859,12 +881,48 @@ function filterByYear(items){
 
 function save(){
   localStorage.setItem('ic_imm', JSON.stringify(immeubles));
-  // Sync to Firebase
   fbSave();
-  // Sync to Drive if connected
   if(typeof driveToken!=='undefined'&&driveToken){
     clearTimeout(window._driveSaveTimer);
     window._driveSaveTimer=setTimeout(driveSaveData,3000);
+  }
+}
+
+// Compress image to max 800px and quality 0.6
+function compressImage(dataUrl, maxSize=800, quality=0.6){
+  return new Promise(resolve=>{
+    if(!dataUrl||!dataUrl.startsWith('data:image')){resolve(dataUrl);return;}
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      let w=img.width,h=img.height;
+      if(w>maxSize||h>maxSize){
+        if(w>h){h=Math.round(h*maxSize/w);w=maxSize;}
+        else{w=Math.round(w*maxSize/h);h=maxSize;}
+      }
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=()=>resolve(dataUrl);
+    img.src=dataUrl;
+  });
+}
+
+// Compress all receipts in immeubles before Firebase save
+async function compressAll(){
+  for(const imm of immeubles){
+    for(const d of (imm.depenses||[])){
+      // Only compress base64 images, not Storage URLs (https://)
+      if(d.receipt&&d.receipt.startsWith('data:image')&&d.receipt.length>100000){
+        d.receipt=await compressImage(d.receipt);
+      }
+    }
+    for(const r of (imm.revenus||[])){
+      if(r.receipt&&r.receipt.startsWith('data:image')&&r.receipt.length>100000){
+        r.receipt=await compressImage(r.receipt);
+      }
+    }
   }
 }
 
@@ -875,6 +933,10 @@ function fbSave(){
   _fbSaveTimer = setTimeout(async ()=>{
     if(!window._fbReady) return;
     try{
+      // Compress images first to avoid Firestore quota
+      await compressAll();
+      // Save locally with compressed images
+      localStorage.setItem('ic_imm', JSON.stringify(immeubles));
       await window._fbSetDoc(
         window._fbDoc(window._fbDb, 'immocompta', 'shared'),
         { immeubles: immeubles, _lastDevice: window._deviceId, _saved: new Date().toISOString() }
@@ -1078,8 +1140,9 @@ const badge = cat => cat?`<span class="badge ${CAT_BG[cat]||'bg-other'}">${cat}<
 // ══════════════════════════════════════════════════
 // RECEIPT CELL
 // ══════════════════════════════════════════════════
+function isImageReceipt(r){return r&&(r.startsWith('data:image')||r.startsWith('https://'));}
 function rcell(item,type,immId){
-  if(item.receipt&&item.receipt.startsWith('data:image'))
+  if(isImageReceipt(item.receipt))
     return `<img src="${item.receipt}" style="width:32px;height:32px;border-radius:4px;object-fit:cover;border:1px solid var(--bdr);cursor:pointer" onclick="openLB('${item.id}','${type}','${immId}')" title="Voir">`;
   if(item.receipt)
     return `<span style="cursor:pointer;font-size:18px" onclick="dlR('${item.id}','${type}','${immId}')" title="Télécharger">📄</span>`;
@@ -1268,7 +1331,7 @@ function renderGallery(){
     const color=IMM_COLORS[idx%8];
     const cards=items.map(x=>{
       const t=x._type==='Dépense'?'dep':'rev';
-      const isImg=x.receipt.startsWith('data:image');
+      const isImg=isImageReceipt(x.receipt);
       const typeBadge=x._type==='Dépense'
         ?`<span style="font-size:10px;background:var(--red-l);color:var(--red);padding:1px 6px;border-radius:99px;font-weight:600">Dépense</span>`
         :`<span style="font-size:10px;background:var(--grn-l);color:var(--grn);padding:1px 6px;border-radius:99px;font-weight:600">Revenu</span>`;
@@ -1685,40 +1748,83 @@ function updST(){
   const el=$('sd-ttc');if(el)el.value=m||t?fmt(m+t):'';
 }
 
-function saveScanEntry(){
+async function saveScanEntry(){
   const imm=activeImm();if(!imm)return false;
-  if(scanType==='dep'){
+  // Validate first
+  let entryData, isDepense = scanType==='dep';
+  if(isDepense){
     const date=$('sd-date')?.value,desc=$('sd-desc')?.value?.trim(),mont=parseFloat($('sd-mont')?.value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return false;}
-    imm.depenses.push({id:uid(),date,desc,cat:$('sd-cat')?.value||'',fournisseur:$('sd-four')?.value?.trim()||'',montant:mont,tax:parseFloat($('sd-tax')?.value)||0,notes:$('sd-notes')?.value?.trim()||'',receipt:curScanData,receiptName:curScanFile?.name||''});
+    entryData={id:uid(),date,desc,cat:$('sd-cat')?.value||'',fournisseur:$('sd-four')?.value?.trim()||'',montant:mont,tax:parseFloat($('sd-tax')?.value)||0,notes:$('sd-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||''};
   }else{
     const date=$('sr-date')?.value,desc=$('sr-desc')?.value?.trim(),mont=parseFloat($('sr-mont')?.value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return false;}
-    imm.revenus.push({id:uid(),date,desc,cat:$('sr-cat')?.value||'',source:$('sr-src')?.value?.trim()||'',unite:$('sr-unite')?.value?.trim()||'',montant:mont,recu:$('sr-recu')?.value?.trim()||'',notes:$('sr-notes')?.value?.trim()||'',receipt:curScanData,receiptName:curScanFile?.name||''});
+    entryData={id:uid(),date,desc,cat:$('sr-cat')?.value||'',source:$('sr-src')?.value?.trim()||'',unite:$('sr-unite')?.value?.trim()||'',montant:mont,recu:$('sr-recu')?.value?.trim()||'',notes:$('sr-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||''};
   }
+
+  // Upload image to Firebase Storage if present
+  if(curScanData && curScanData.startsWith('data:image')){
+    try{
+      const compressed = await compressImage(curScanData, 1200, 0.7);
+      const path = `receipts/${imm.id}/${entryData.id}.jpg`;
+      toast('☁ Téléversement de la photo...', 'ok');
+      const url = await window._fbUploadImage(path, compressed);
+      entryData.receipt = url;       // store URL instead of base64
+      entryData.receiptPath = path;  // store path for deletion
+    }catch(err){
+      console.error('Storage upload error:', err);
+      // Fallback: store compressed base64 locally
+      entryData.receipt = await compressImage(curScanData, 800, 0.5);
+    }
+  } else if(curScanData){
+    // PDF or other — keep as is (compressed if possible)
+    entryData.receipt = curScanData;
+  }
+
+  if(isDepense) imm.depenses.push(entryData);
+  else imm.revenus.push(entryData);
+
   save();renderDep();renderRev();renderRail();return true;
 }
 
-function saveAndNext(){if(!saveScanEntry())return;scanIdx++;if(scanIdx<scanQueue.length)openScan(scanQueue[scanIdx],scanType);else{closeScan();toast(scanQueue.length>1?scanQueue.length+' entrées sauvegardées':'Sauvegardé','ok');}}
+async function saveAndNext(){if(!await saveScanEntry())return;scanIdx++;if(scanIdx<scanQueue.length)openScan(scanQueue[scanIdx],scanType);else{closeScan();toast(scanQueue.length>1?scanQueue.length+' entrées sauvegardées':'Sauvegardé','ok');}}
 function skipQ(){scanIdx++;if(scanIdx<scanQueue.length)openScan(scanQueue[scanIdx],scanType);else closeScan();}
 function closeScan(){$('ov-scan').classList.remove('open');scanQueue=[];scanIdx=0;}
 
 // ══════════════════════════════════════════════════
 // QUICK ADD / LIGHTBOX / DOWNLOAD
 // ══════════════════════════════════════════════════
-function quickAdd(e,id,type,immId){
+async function quickAdd(e,id,type,immId){
   const file=e.target.files[0];if(!file)return;
-  const r=new FileReader();r.onload=ev=>{
-    const imm=getImm(immId);if(!imm)return;
-    if(type==='dep')imm.depenses=imm.depenses.map(d=>d.id===id?{...d,receipt:ev.target.result,receiptName:file.name}:d);
-    else imm.revenus=imm.revenus.map(x=>x.id===id?{...x,receipt:ev.target.result,receiptName:file.name}:x);
+  const imm=getImm(immId);if(!imm)return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    let receiptVal=ev.target.result, receiptPath=null;
+    // Upload images to Storage
+    if(ev.target.result.startsWith('data:image')){
+      try{
+        const compressed=await compressImage(ev.target.result,1200,0.7);
+        const path=`receipts/${immId}/${id}.jpg`;
+        toast('☁ Téléversement...','ok');
+        receiptVal=await window._fbUploadImage(path,compressed);
+        receiptPath=path;
+      }catch(err){
+        console.error('Upload error:',err);
+        receiptVal=await compressImage(ev.target.result,800,0.5);
+      }
+    }
+    if(type==='dep')imm.depenses=imm.depenses.map(d=>d.id===id?{...d,receipt:receiptVal,receiptPath,receiptName:file.name}:d);
+    else imm.revenus=imm.revenus.map(x=>x.id===id?{...x,receipt:receiptVal,receiptPath,receiptName:file.name}:x);
     save();renderDep();renderRev();renderGallery();toast('Document ajouté','ok');
-  };r.readAsDataURL(file);
+  };
+  r.readAsDataURL(file);
 }
 function openLB(id,type,immId){
   const imm=getImm(immId);if(!imm)return;
   const item=type==='dep'?imm.depenses.find(x=>x.id===id):imm.revenus.find(x=>x.id===id);
-  if(!item?.receipt?.startsWith('data:image'))return;
+  // Handle both base64 images and Storage URLs
+  const isImg=item?.receipt&&(item.receipt.startsWith('data:image')||item.receipt.startsWith('https://'));
+  if(!isImg)return;
   $('lb-img').src=item.receipt;$('lb-cap').textContent=(item.desc||'')+(item.receiptName?' — '+item.receiptName:'');
   $('lb').classList.add('open');
 }
@@ -1787,9 +1893,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan
 // ══════════════════════════════════════════════════
 const DRIVE_FILE_NAME='ImmoCompta_donnees.json';
 const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
-let driveToken=null;
-let driveFileId=localStorage.getItem('ic_drive_file_id')||null;
-let _driveSaveTimer=null,driveAutoSave=null;
 
 function driveUpdateUI(){
   const connected=!!driveToken;
@@ -2068,7 +2171,7 @@ function genPDF(type){
   const sansFacture=items.filter(x=>!x.receipt);
 
   avecFacture.forEach((x,i)=>{
-    const isImg=x.receipt&&x.receipt.startsWith('data:image');
+    const isImg=x.receipt&&(x.receipt.startsWith('data:image')||x.receipt.startsWith('https://'));
     const montantAff=isDep?fmt((x.montant||0)+(x.tax||0)):fmt(x.montant||0);
     html+=`<div class="facture-page">
       <div class="facture-header">
