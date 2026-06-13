@@ -553,9 +553,9 @@ tbody tr:hover{background:var(--surf2)}
         <select id="f-dep-mois" onchange="renderDep()"><option value="">Tous les mois</option><option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option><option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option><option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option><option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option></select>
       </div>
       <div class="card"><div class="table-wrap">
-        <table><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Catégorie</th><th>Fournisseur</th><th>Montant HT</th><th>TPS/TVQ</th><th>Total TTC</th><th>Reçu</th><th></th></tr></thead>
+        <table><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Catégorie</th><th>Fournisseur</th><th>Montant HT</th><th>TPS/TVQ</th><th>Total TTC</th><th style="text-align:center">Payé par</th><th>Reçu</th><th></th></tr></thead>
         <tbody id="tb-dep"></tbody>
-        <tfoot><tr class="tfoot"><td colspan="5">Total</td><td class="amt" id="tot-ht">—</td><td class="amt" id="tot-tax">—</td><td class="amt neg" id="tot-ttc">—</td><td colspan="2"></td></tr></tfoot>
+        <tfoot><tr class="tfoot"><td colspan="5">Total</td><td class="amt" id="tot-ht">—</td><td class="amt" id="tot-tax">—</td><td class="amt neg" id="tot-ttc">—</td><td colspan="3"></td></tr></tfoot>
         </table>
       </div></div>
     </div>
@@ -1348,22 +1348,46 @@ function renderDep(){
     return (!s||(d.desc+d.fournisseur+d.cat).toLowerCase().includes(s))&&(!cat||d.cat===cat)&&(!mois||d.date.slice(5,7)===mois);
   }).sort((a,b)=>b.date.localeCompare(a.date));
   const tb=$('tb-dep');
-  if(!rows.length){tb.innerHTML=`<tr><td colspan="10" class="empty">Aucune dépense — déposez une facture dans la zone IA ou cliquez + Dépense</td></tr>`;
+  // Tints by payer
+  const TINT={
+    'Jim':'rgba(59,130,246,.08)',          // bleu
+    'Antoine':'rgba(16,185,129,.08)',       // vert
+    'Jean-Christophe':'rgba(245,158,11,.08)' // orange
+  };
+  const SHORT={
+    'Jim':'Jim',
+    'Antoine':'Antoine',
+    'Jean-Christophe':'JC'
+  };
+  const COLORS={
+    'Jim':'#3b82f6',
+    'Antoine':'#10b981',
+    'Jean-Christophe':'#f59e0b'
+  };
+  if(!rows.length){tb.innerHTML=`<tr><td colspan="11" class="empty">Aucune dépense — déposez une facture dans la zone IA ou cliquez + Dépense</td></tr>`;
   }else{
-    tb.innerHTML=rows.map((d,i)=>`<tr>
-      <td style="color:var(--ink3);font-size:11px">${i+1}</td>
-      <td style="font-size:12px;white-space:nowrap;color:var(--ink2)">${d.date}</td>
-      <td><strong>${d.desc||''}</strong>${d.notes?`<div style="font-size:11px;color:var(--ink3)">${d.notes}</div>`:''}</td>
-      <td>${badge(d.cat)}</td>
-      <td style="font-size:12px;color:var(--ink2)">${d.fournisseur||''}</td>
-      <td class="amt">${fmt(d.montant)}</td>
-      <td style="font-size:12px;color:var(--ink3)">${d.tax?fmt(d.tax):''}</td>
-      <td class="amt neg">${fmt((d.montant||0)+(d.tax||0))}</td>
-      <td>${rcell(d,'dep',imm.id)}</td>
-      <td><div style="display:flex;gap:3px">
-        <button class="btn btn-out btn-xs" onclick="openEditDep('${d.id}')">✏</button>
-        <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #fca5a5" onclick="delEntry('${d.id}','dep')">✕</button>
-      </div></td></tr>`).join('');
+    tb.innerHTML=rows.map((d,i)=>{
+      const p=d.payepar||'';
+      const tint=TINT[p]?`style="background:${TINT[p]}"`:'';
+      const payerBadge=p
+        ?`<span style="background:${COLORS[p]};color:#fff;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap">${SHORT[p]}</span>`
+        :`<span style="background:#e4e2da;color:#666;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:500;white-space:nowrap">Commun</span>`;
+      return `<tr ${tint}>
+        <td style="color:var(--ink3);font-size:11px">${i+1}</td>
+        <td style="font-size:12px;white-space:nowrap;color:var(--ink2)">${d.date}</td>
+        <td><strong>${d.desc||''}</strong>${d.notes?`<div style="font-size:11px;color:var(--ink3)">${d.notes}</div>`:''}</td>
+        <td>${badge(d.cat)}</td>
+        <td style="font-size:12px;color:var(--ink2)">${d.fournisseur||''}</td>
+        <td class="amt">${fmt(d.montant)}</td>
+        <td style="font-size:12px;color:var(--ink3)">${d.tax?fmt(d.tax):''}</td>
+        <td class="amt neg">${fmt((d.montant||0)+(d.tax||0))}</td>
+        <td style="text-align:center">${payerBadge}</td>
+        <td>${rcell(d,'dep',imm.id)}</td>
+        <td><div style="display:flex;gap:3px">
+          <button class="btn btn-out btn-xs" onclick="openEditDep('${d.id}')">✏</button>
+          <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #fca5a5" onclick="delEntry('${d.id}','dep')">✕</button>
+        </div></td></tr>`;
+    }).join('');
   }
   const ht=rows.reduce((s,d)=>s+(d.montant||0),0);
   const tx=rows.reduce((s,d)=>s+(d.tax||0),0);
