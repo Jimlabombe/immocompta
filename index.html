@@ -1571,13 +1571,17 @@ function saveMan(){
   if(manType==='dep'){
     const date=$('md-date').value,desc=$('md-desc').value.trim(),mont=parseFloat($('md-mont').value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return;}
-    const obj={id:editId||uid(),date,desc,cat:$('md-cat').value,fournisseur:$('md-four').value.trim(),montant:mont,tax:parseFloat($('md-tax').value)||0,payepar:$('md-payepar').value||'',notes:$('md-notes').value.trim(),receipt:null,receiptName:''};
+    const obj={id:editId||uid(),date,desc,cat:$('md-cat').value,fournisseur:$('md-four').value.trim(),montant:mont,tax:parseFloat($('md-tax').value)||0,payepar:$('md-payepar').value||'',notes:$('md-notes').value.trim()};
+    // For new entries only, init receipt fields
+    if(!editId){obj.receipt=null;obj.receiptName='';}
+    // For edits, the spread will preserve existing receipt/receiptName/receiptPath
     if(editId)imm.depenses=imm.depenses.map(d=>d.id===editId?{...d,...obj}:d);
     else imm.depenses.push(obj);
   }else{
     const date=$('mr-date').value,desc=$('mr-desc').value.trim(),mont=parseFloat($('mr-mont').value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return;}
-    const obj={id:editId||uid(),date,desc,cat:$('mr-cat').value,source:$('mr-src').value.trim(),unite:$('mr-unite').value.trim(),montant:mont,recu:$('mr-recu').value.trim(),notes:$('mr-notes').value.trim(),receipt:null,receiptName:''};
+    const obj={id:editId||uid(),date,desc,cat:$('mr-cat').value,source:$('mr-src').value.trim(),unite:$('mr-unite').value.trim(),montant:mont,recu:$('mr-recu').value.trim(),notes:$('mr-notes').value.trim()};
+    if(!editId){obj.receipt=null;obj.receiptName='';}
     if(editId)imm.revenus=imm.revenus.map(r=>r.id===editId?{...r,...obj}:r);
     else imm.revenus.push(obj);
   }
