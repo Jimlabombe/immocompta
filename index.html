@@ -573,7 +573,7 @@ tbody tr:hover{background:var(--surf2)}
         <select id="f-rev-mois" onchange="renderRev()"><option value="">Tous les mois</option><option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option><option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option><option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option><option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option></select>
       </div>
       <div class="card"><div class="table-wrap">
-        <table><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Type</th><th>Source / Locataire</th><th>Unité</th><th>Montant</th><th>Reçu #</th><th>Preuve</th><th></th></tr></thead>
+        <table><thead><tr><th>#</th><th>Date</th><th>Description</th><th>Type</th><th>Source / Locataire</th><th>Unité</th><th>Montant</th><th style="text-align:center">Payé</th><th>Preuve</th><th></th></tr></thead>
         <tbody id="tb-rev"></tbody>
         <tfoot><tr class="tfoot"><td colspan="6">Total revenus</td><td class="amt pos" id="tot-rev">—</td><td colspan="3"></td></tr></tfoot>
         </table>
@@ -728,12 +728,13 @@ tbody tr:hover{background:var(--surf2)}
     <div class="fgrid">
       <div class="fg"><label>Prénom</label><input type="text" id="loc-prenom" placeholder="Jean"></div>
       <div class="fg"><label>Nom de famille</label><input type="text" id="loc-nom" placeholder="Tremblay"></div>
-      <div class="fg full"><label>Courriel</label><input type="email" id="loc-email" placeholder="jean.tremblay@exemple.com"></div>
-      <div class="fg"><label>Téléphone</label><input type="tel" id="loc-tel" placeholder="418-555-1234"></div>
-      <div class="fg"><label>N° d'unité / Logement</label><input type="text" id="loc-unite" placeholder="ex. 101 ou 1er étage"></div>
-      <div class="fg"><label>Loyer mensuel ($)</label><input type="number" id="loc-loyer" step="0.01" placeholder="850.00"></div>
-      <div class="fg"><label>Début du bail</label><input type="date" id="loc-debut"></div>
-      <div class="fg full"><label>Notes</label><textarea id="loc-notes" rows="2" placeholder="Notes optionnelles"></textarea></div>
+      <div class="fg full"><label>Téléphone</label><input type="tel" id="loc-tel" placeholder="418-555-1234"></div>
+      <div class="fg full"><label>N° d'unité / Logement</label><input type="text" id="loc-unite" placeholder="ex. 101"></div>
+      <div class="fg full">
+        <label>Bail (PDF ou photo)</label>
+        <input type="file" id="loc-bail-file" accept="image/*,application/pdf" style="padding:6px;font-size:12px">
+        <div id="loc-bail-current" style="font-size:11px;color:var(--ink3);margin-top:4px"></div>
+      </div>
     </div>
   </div>
   <div class="mf" id="loc-modal-footer"><button class="btn btn-out" onclick="closeLocModal()">Annuler</button><button class="btn btn-ink" onclick="saveLoc()">✓ Enregistrer</button></div>
@@ -1310,7 +1311,10 @@ function renderRev(){
   const tb=$('tb-rev');
   if(!rows.length){tb.innerHTML=`<tr><td colspan="10" class="empty">Aucun revenu — utilisez le générateur de loyers ou cliquez + Revenu</td></tr>`;
   }else{
-    tb.innerHTML=rows.map((r,i)=>`<tr>
+    tb.innerHTML=rows.map((r,i)=>{
+      const paid=r.paye===true;
+      const rowStyle=paid?'style="background:rgba(52,163,103,.08)"':'';
+      return `<tr ${rowStyle}>
       <td style="color:var(--ink3);font-size:11px">${i+1}</td>
       <td style="font-size:12px;white-space:nowrap;color:var(--ink2)">${r.date}</td>
       <td><strong>${r.desc||''}</strong>${r.notes?`<div style="font-size:11px;color:var(--ink3)">${r.notes}</div>`:''}</td>
@@ -1318,15 +1322,22 @@ function renderRev(){
       <td style="font-size:12px;color:var(--ink2)">${r.source||''}</td>
       <td style="font-size:12px;color:var(--ink2)">${r.unite||''}</td>
       <td class="amt pos">${fmt(r.montant)}</td>
-      <td style="font-size:11px;color:var(--ink3)">${r.recu||''}</td>
+      <td style="text-align:center"><input type="checkbox" ${paid?'checked':''} onchange="toggleRevPaid('${r.id}',this.checked)" style="width:18px;height:18px;cursor:pointer;accent-color:#34a367"></td>
       <td>${rcell(r,'rev',imm.id)}</td>
       <td><div style="display:flex;gap:3px">
         <button class="btn btn-out btn-xs" onclick="openEditRev('${r.id}')">✏</button>
         <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #fca5a5" onclick="delEntry('${r.id}','rev')">✕</button>
-      </div></td></tr>`).join('');
+      </div></td></tr>`;
+    }).join('');
   }
   $('tot-rev').textContent=fmt(rows.reduce((s,r)=>s+(r.montant||0),0));
   $('cnt-rev').textContent=imm.revenus.length;
+}
+
+function toggleRevPaid(id,checked){
+  const imm=activeImm();if(!imm)return;
+  const r=imm.revenus.find(x=>x.id===id);
+  if(r){r.paye=checked;save();renderRev();}
 }
 
 // ══════════════════════════════════════════════════
@@ -1985,37 +1996,22 @@ function renderLoc(){
   const MOIS=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
   let html='';
   locs.forEach(loc=>{
-    if(!loc.paiements)loc.paiements={};
-    const yearKey=String(activeYear);
-    if(!loc.paiements[yearKey])loc.paiements[yearKey]=[false,false,false,false,false,false,false,false,false,false,false,false];
-    const pays=loc.paiements[yearKey];
-    const paid=pays.filter(p=>p).length;
-    const total=(loc.loyer||0)*12;
-    const collected=(loc.loyer||0)*paid;
+    const hasBail=loc.bail&&(loc.bail.startsWith('https://')||loc.bail.startsWith('data:'));
     html+=`<div class="loc-card">
       <div class="loc-header">
         <div>
           <div class="loc-name">${loc.prenom||''} ${loc.nom||''}</div>
-          <div class="loc-unit">${loc.unite?'Logement '+loc.unite:''} ${loc.loyer?'· '+fmt(loc.loyer)+'/mois':''}</div>
+          <div class="loc-unit">${loc.unite?'Logement '+loc.unite:''}</div>
         </div>
         <div class="loc-actions">
+          ${hasBail?`<button onclick="openBailDoc('${loc.id}')" title="Voir le bail" style="color:var(--blu-m);font-weight:600">📄 Bail</button>`:''}
           <button onclick="openLocModal('${loc.id}')" title="Modifier">✏️</button>
           <button onclick="deleteLoc('${loc.id}')" title="Supprimer">🗑️</button>
         </div>
       </div>
       <div class="loc-info">
-        ${loc.email?`<div class="loc-info-item"><span class="lbl">Courriel</span><a href="mailto:${loc.email}" class="val">${loc.email}</a></div>`:''}
         ${loc.tel?`<div class="loc-info-item"><span class="lbl">Téléphone</span><a href="tel:${loc.tel}" class="val">${loc.tel}</a></div>`:''}
-        ${loc.debut?`<div class="loc-info-item"><span class="lbl">Début du bail</span><span class="val">${loc.debut}</span></div>`:''}
-      </div>
-      ${loc.notes?`<div style="font-size:12px;color:var(--ink3);background:var(--surf2);padding:.5rem;border-radius:var(--rs);margin-bottom:.75rem">📝 ${loc.notes}</div>`:''}
-      <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:6px">Loyers ${activeYear}</div>
-      <div class="loc-months">
-        ${pays.map((p,i)=>`<div class="loc-month ${p?'paid':''}" onclick="toggleLoyer('${loc.id}',${i})"><span class="month-name">${MOIS[i]}</span><span class="month-check">${p?'✓':'○'}</span></div>`).join('')}
-      </div>
-      <div class="loc-progress">
-        <span><strong>${paid}/12</strong> mois payés</span>
-        <span>Encaissé : <strong style="color:var(--grn)">${fmt(collected)}</strong> / ${fmt(total)}</span>
+        ${hasBail?`<div class="loc-info-item"><span class="lbl">Bail</span><span class="val" style="color:var(--grn)">✓ Disponible</span></div>`:`<div class="loc-info-item"><span class="lbl">Bail</span><span class="val" style="color:var(--ink3)">Aucun</span></div>`}
       </div>
     </div>`;
   });
@@ -2035,42 +2031,77 @@ function toggleLoyer(locId,monthIdx){
 
 function openLocModal(id){
   editLocId=id||null;
+  ['loc-prenom','loc-nom','loc-tel','loc-unite'].forEach(i=>{const e=$(i);if(e)e.value='';});
+  $('loc-bail-file').value='';
+  $('loc-bail-current').textContent='';
   if(id){
     const imm=activeImm();const loc=imm?.locataires?.find(l=>l.id===id);
     if(loc){
       $('loc-modal-title').textContent='Modifier le locataire';
       $('loc-prenom').value=loc.prenom||'';
       $('loc-nom').value=loc.nom||'';
-      $('loc-email').value=loc.email||'';
       $('loc-tel').value=loc.tel||'';
       $('loc-unite').value=loc.unite||'';
-      $('loc-loyer').value=loc.loyer||'';
-      $('loc-debut').value=loc.debut||'';
-      $('loc-notes').value=loc.notes||'';
+      if(loc.bail){
+        $('loc-bail-current').innerHTML=`✓ Bail actuel : ${loc.bailName||'document'} <a href="#" onclick="event.preventDefault();openBailDoc('${loc.id}')" style="color:var(--blu-m);margin-left:6px">Voir</a>`;
+      }
     }
   }else{
     $('loc-modal-title').textContent='Ajouter un locataire';
-    ['loc-prenom','loc-nom','loc-email','loc-tel','loc-unite','loc-loyer','loc-debut','loc-notes'].forEach(id=>{const e=$(id);if(e)e.value='';});
   }
   $('ov-loc').classList.add('open');
 }
 function closeLocModal(){$('ov-loc').classList.remove('open');editLocId=null;}
 
-function saveLoc(){
+async function saveLoc(){
   const imm=activeImm();if(!imm){toast('Sélectionnez un immeuble','err');return;}
   if(!imm.locataires)imm.locataires=[];
   const prenom=$('loc-prenom').value.trim();
   const nom=$('loc-nom').value.trim();
   if(!prenom&&!nom){toast('Nom ou prénom requis','err');return;}
-  const data={prenom,nom,email:$('loc-email').value.trim(),tel:$('loc-tel').value.trim(),unite:$('loc-unite').value.trim(),loyer:parseFloat($('loc-loyer').value)||0,debut:$('loc-debut').value,notes:$('loc-notes').value.trim()};
+  const data={prenom,nom,tel:$('loc-tel').value.trim(),unite:$('loc-unite').value.trim()};
+
+  // Handle bail upload
+  const bailFile=$('loc-bail-file').files[0];
+  if(bailFile){
+    toast('☁ Téléversement du bail...','ok');
+    try{
+      const reader=new FileReader();
+      const dataUrl=await new Promise((res,rej)=>{
+        reader.onload=e=>res(e.target.result);
+        reader.onerror=rej;
+        reader.readAsDataURL(bailFile);
+      });
+      const tenantId=editLocId||uid();
+      const path=`baux/${imm.id}/${tenantId}.${bailFile.name.split('.').pop()}`;
+      const url=await window._fbUploadImage(path,dataUrl);
+      data.bail=url;
+      data.bailName=bailFile.name;
+      data.bailPath=path;
+      if(!editLocId)data.id=tenantId;
+    }catch(err){
+      console.error('Bail upload error:',err);
+      toast('Erreur téléversement du bail','err');
+      return;
+    }
+  }
+
   if(editLocId){
     imm.locataires=imm.locataires.map(l=>l.id===editLocId?{...l,...data}:l);
     toast('Locataire modifié','ok');
   }else{
-    imm.locataires.push({id:uid(),...data,paiements:{}});
+    imm.locataires.push({id:data.id||uid(),...data});
     toast('Locataire ajouté','ok');
   }
   save();renderLoc();closeLocModal();
+}
+
+function openBailDoc(locId){
+  const imm=activeImm();if(!imm)return;
+  const loc=imm.locataires.find(l=>l.id===locId);
+  if(!loc?.bail)return;
+  // Open in new tab so PDF and image both work
+  window.open(loc.bail,'_blank');
 }
 
 function deleteLoc(id){
