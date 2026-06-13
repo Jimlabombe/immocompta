@@ -955,25 +955,28 @@ function fbSave(){
   }, 2000);
 }
 
-// Load from Firebase on startup
+// Load from Firebase on startup — Firebase is ALWAYS the source of truth
 async function fbLoad(){
   if(!window._fbReady){ setTimeout(fbLoad, 500); return; }
   try{
     const snap = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta', 'shared'));
     if(snap.exists()){
       const data = snap.data();
-      if(data.immeubles && data.immeubles.length > 0){
-        // Use Firebase data if it's newer or local is empty
-        const localEmpty = !immeubles.length;
-        if(localEmpty){
-          immeubles = data.immeubles;
-          localStorage.setItem('ic_imm', JSON.stringify(immeubles));
-          activeImmId = immeubles[0]?.id || null;
-          renderRail();
-          showPanel('global');
-          toast('☁ Données chargées depuis Firebase', 'ok');
-        }
+      if(data.immeubles){
+        // ALWAYS use Firebase data — it's the shared source of truth
+        // This prevents local empty data from overwriting Firebase
+        immeubles = data.immeubles;
+        localStorage.setItem('ic_imm', JSON.stringify(immeubles));
+        activeImmId = immeubles[0]?.id || null;
+        renderRail();
+        showPanel('global');
+        if(data.immeubles.length > 0)
+          toast('☁ Données chargées depuis Firebase ('+data.immeubles.length+' immeubles)', 'ok');
       }
+    } else if(immeubles.length > 0){
+      // Firebase document doesn't exist yet but we have local data — push it up
+      console.log('Pushing local data to Firebase (first time setup)');
+      fbSave();
     }
     // Show Firebase status
     const dot = $('fb-dot');
@@ -982,6 +985,7 @@ async function fbLoad(){
     if(txt) txt.textContent = 'Firebase actif';
   } catch(err){
     console.error('Firebase load error:', err);
+    toast('Erreur de chargement Firebase — données locales utilisées', 'err');
   }
 }
 
