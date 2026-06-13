@@ -238,6 +238,55 @@ tbody tr:hover{background:var(--surf2)}
 .queue-bar{background:var(--surf2);border-top:1px solid var(--bdr);padding:.75rem 1.5rem;display:flex;align-items:center;gap:10px;font-size:13px;flex-shrink:0}
 .igroup{display:flex;align-items:center;gap:6px}
 
+/* ── LOCATAIRES ── */
+.loc-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1rem}
+.loc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid var(--bdr)}
+.loc-name{font-size:1.05rem;font-weight:700;color:var(--ink)}
+.loc-unit{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.loc-info{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem;font-size:13px}
+.loc-info-item{display:flex;flex-direction:column;gap:2px}
+.loc-info-item .lbl{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em}
+.loc-info-item .val{color:var(--ink);font-weight:500}
+.loc-info-item a{color:var(--blu-m);text-decoration:none}
+.loc-info-item a:hover{text-decoration:underline}
+.loc-months{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:.75rem}
+.loc-month{aspect-ratio:1;border:1.5px solid var(--bdr2);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;font-size:10px;font-weight:600;color:var(--ink3);transition:.15s;background:var(--surf)}
+.loc-month:hover{border-color:var(--ink2)}
+.loc-month.paid{background:var(--grn);color:#fff;border-color:var(--grn);box-shadow:0 1px 3px rgba(52,163,103,.3)}
+.loc-month.late{background:var(--red-l);color:var(--red);border-color:var(--red-m)}
+.loc-month .month-name{font-size:9px;opacity:.7;font-weight:500;line-height:1}
+.loc-month .month-check{font-size:14px;margin-top:1px;line-height:1}
+.loc-progress{display:flex;justify-content:space-between;align-items:center;margin-top:.75rem;font-size:12px;color:var(--ink3)}
+.loc-progress strong{color:var(--ink);font-weight:600}
+.loc-actions{display:flex;gap:6px;align-items:flex-start}
+.loc-actions button{background:transparent;border:none;cursor:pointer;padding:4px 6px;font-size:14px;border-radius:4px;color:var(--ink3)}
+.loc-actions button:hover{background:var(--surf2);color:var(--ink)}
+
+/* ── HYPOTHÈQUE ── */
+.hyp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:1.5rem}
+.hyp-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem}
+.hyp-card .lbl{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.hyp-card .val{font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.hyp-card .sub{font-size:11px;color:var(--ink3);margin-top:4px}
+.hyp-card.equity{background:linear-gradient(135deg,var(--grn-l),var(--surf));border-color:var(--grn-m)}
+.hyp-card.equity .val{color:var(--grn)}
+.hyp-card.debt{background:linear-gradient(135deg,var(--red-l),var(--surf));border-color:var(--red-m)}
+.hyp-card.debt .val{color:var(--red)}
+.hyp-bar{margin:1.5rem 0;background:var(--surf2);border-radius:var(--rs);padding:1rem}
+.hyp-bar-track{height:36px;background:var(--surf);border-radius:var(--rs);overflow:hidden;display:flex;border:1px solid var(--bdr)}
+.hyp-bar-equity{background:var(--grn);display:flex;align-items:center;justify-content:flex-start;padding-left:10px;color:#fff;font-size:12px;font-weight:600;transition:.4s}
+.hyp-bar-debt{background:var(--red);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;color:#fff;font-size:12px;font-weight:600;transition:.4s;flex:1}
+.hyp-table{width:100%;border-collapse:collapse;margin-top:1.5rem;font-size:13px}
+.hyp-table th{background:var(--surf2);text-align:left;padding:8px 12px;font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--bdr)}
+.hyp-table th.r{text-align:right}
+.hyp-table td{padding:8px 12px;border-bottom:1px solid var(--bdr);font-variant-numeric:tabular-nums}
+.hyp-table td.r{text-align:right;font-weight:600}
+.hyp-table tr:nth-child(even) td{background:var(--surf2)}
+.hyp-table .cap{color:var(--grn)}
+.hyp-table .int{color:var(--red)}
+.hyp-empty{text-align:center;padding:3rem;background:var(--surf);border:1px dashed var(--bdr2);border-radius:var(--r)}
+.hyp-empty-icon{font-size:3rem;margin-bottom:.5rem;opacity:.5}
+
 /* ── ÉCRAN MOT DE PASSE ── */
 .pw-screen{position:fixed;inset:0;background:var(--ink);z-index:9999;display:flex;align-items:center;justify-content:center}
 .pw-box{background:#fff;border-radius:var(--rl);padding:2.5rem;width:360px;text-align:center;box-shadow:var(--shl)}
@@ -325,6 +374,8 @@ tbody tr:hover{background:var(--surf2)}
   <div class="rail-section">Immeuble actif</div>
   <button class="rail-btn" id="nav-dep" onclick="showPanel('dep')"><span class="ic">📋</span> Dépenses <span class="cnt" id="cnt-dep">0</span></button>
   <button class="rail-btn" id="nav-rev" onclick="showPanel('rev')"><span class="ic">💰</span> Revenus <span class="cnt" id="cnt-rev">0</span></button>
+  <button class="rail-btn" id="nav-loc" onclick="showPanel('loc')"><span class="ic">👥</span> Locataires <span class="cnt" id="cnt-loc">0</span></button>
+  <button class="rail-btn" id="nav-hyp" onclick="showPanel('hyp')"><span class="ic">🏦</span> Hypothèque</button>
   <button class="rail-btn" id="nav-res" onclick="showPanel('res')"><span class="ic">📊</span> Résultats</button>
 
   <div class="sep" style="margin:.5rem .75rem"></div>
@@ -551,6 +602,16 @@ tbody tr:hover{background:var(--surf2)}
       </div>
     </div>
 
+    <!-- ═══════════════════ PANEL LOCATAIRES ═══════════════════ -->
+    <div class="panel" id="panel-loc">
+      <div id="loc-content"></div>
+    </div>
+
+    <!-- ═══════════════════ PANEL HYPOTHÈQUE ═══════════════════ -->
+    <div class="panel" id="panel-hyp">
+      <div id="hyp-content"></div>
+    </div>
+
   </div>
 </div>
 </div>
@@ -656,6 +717,50 @@ tbody tr:hover{background:var(--surf2)}
     </div>
   </div>
   <div class="mf"><button class="btn btn-out" onclick="closeAddImm()">Annuler</button><button class="btn btn-ink" onclick="saveImm()">✓ Créer</button></div>
+</div>
+</div>
+
+<!-- ══ MODAL LOCATAIRE ══ -->
+<div class="overlay" id="ov-loc" onclick="if(event.target.id==='ov-loc')closeLocModal()">
+<div class="modal narrow">
+  <div class="mh"><h2 id="loc-modal-title">Ajouter un locataire</h2><button class="xbtn" onclick="closeLocModal()">×</button></div>
+  <div class="mb">
+    <div class="fgrid">
+      <div class="fg"><label>Prénom</label><input type="text" id="loc-prenom" placeholder="Jean"></div>
+      <div class="fg"><label>Nom de famille</label><input type="text" id="loc-nom" placeholder="Tremblay"></div>
+      <div class="fg full"><label>Courriel</label><input type="email" id="loc-email" placeholder="jean.tremblay@exemple.com"></div>
+      <div class="fg"><label>Téléphone</label><input type="tel" id="loc-tel" placeholder="418-555-1234"></div>
+      <div class="fg"><label>N° d'unité / Logement</label><input type="text" id="loc-unite" placeholder="ex. 101 ou 1er étage"></div>
+      <div class="fg"><label>Loyer mensuel ($)</label><input type="number" id="loc-loyer" step="0.01" placeholder="850.00"></div>
+      <div class="fg"><label>Début du bail</label><input type="date" id="loc-debut"></div>
+      <div class="fg full"><label>Notes</label><textarea id="loc-notes" rows="2" placeholder="Notes optionnelles"></textarea></div>
+    </div>
+  </div>
+  <div class="mf" id="loc-modal-footer"><button class="btn btn-out" onclick="closeLocModal()">Annuler</button><button class="btn btn-ink" onclick="saveLoc()">✓ Enregistrer</button></div>
+</div>
+</div>
+
+<!-- ══ MODAL HYPOTHÈQUE ══ -->
+<div class="overlay" id="ov-hyp" onclick="if(event.target.id==='ov-hyp')closeHypModal()">
+<div class="modal narrow">
+  <div class="mh"><h2>Configurer l'hypothèque</h2><button class="xbtn" onclick="closeHypModal()">×</button></div>
+  <div class="mb">
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:1rem;background:var(--blu-l);padding:.75rem;border-radius:var(--rs);border-left:3px solid var(--blu-m)">
+      Entrez les détails de votre hypothèque. Le solde diminuera automatiquement chaque mois selon le calendrier d'amortissement.
+    </p>
+    <div class="fgrid">
+      <div class="fg"><label>Valeur marchande actuelle ($)</label><input type="number" id="hyp-valeur" step="1000" placeholder="450000"></div>
+      <div class="fg"><label>Solde hypothécaire initial ($)</label><input type="number" id="hyp-solde" step="1000" placeholder="320000"></div>
+      <div class="fg"><label>Taux d'intérêt annuel (%)</label><input type="number" id="hyp-taux" step="0.01" placeholder="5.49"></div>
+      <div class="fg"><label>Amortissement (années)</label><input type="number" id="hyp-amort" placeholder="25"></div>
+      <div class="fg"><label>Paiement mensuel ($)</label><input type="number" id="hyp-paiement" step="0.01" placeholder="1950.00"></div>
+      <div class="fg"><label>Date du 1<sup>er</sup> paiement</label><input type="date" id="hyp-debut"></div>
+    </div>
+    <div style="margin-top:.75rem;padding:.625rem;background:var(--surf2);border-radius:var(--rs);font-size:12px;color:var(--ink3)">
+      💡 Si vous ne connaissez pas le paiement mensuel exact, laissez vide — il sera calculé automatiquement.
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-out" onclick="closeHypModal()">Annuler</button><button class="btn btn-ink" onclick="saveHyp()">✓ Enregistrer</button></div>
 </div>
 </div>
 
@@ -1013,7 +1118,7 @@ function showPanel(id){
   document.querySelectorAll('.rail-btn').forEach(b=>b.classList.remove('active'));
   const nb=$('nav-'+id);if(nb)nb.classList.add('active');
 
-  const titles={global:'Tous les immeubles',factures:'Galerie des factures',dep:'Dépenses',rev:'Revenus',res:'Résultats'};
+  const titles={global:'Tous les immeubles',factures:'Galerie des factures',dep:'Dépenses',rev:'Revenus',loc:'Locataires',hyp:'Hypothèque & valeur',res:'Résultats'};
   $('topbar-title').textContent=titles[id]||'';
   const imm=activeImm();
   $('topbar-sub').textContent=(id!=='global'&&id!=='factures'&&imm)?'— '+imm.name+' '+activeYear:'';
@@ -1024,6 +1129,8 @@ function showPanel(id){
     factures:'',
     dep:`<button class="btn btn-out btn-sm" onclick="exportCSV('dep')">⬇ CSV</button><button class="btn btn-out btn-sm" onclick="genPDF('dep')">📄 Rapport PDF</button><button class="btn btn-out btn-sm" onclick="openBail()">📅 Bail / Loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('dep')">+ Dépense</button>`,
     rev:`<button class="btn btn-out btn-sm" onclick="exportCSV('rev')">⬇ CSV</button><button class="btn btn-out btn-sm" onclick="genPDF('rev')">📄 Rapport PDF</button><button class="btn btn-pur btn-sm" onclick="openBail()">📅 Générer loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('rev')">+ Revenu</button>`,
+    loc:`<button class="btn btn-ink btn-sm" onclick="openLocModal()">+ Ajouter locataire</button>`,
+    hyp:`<button class="btn btn-ink btn-sm" onclick="openHypModal()">⚙ Configurer</button>`,
     res:`<button class="btn btn-out btn-sm" onclick="genResPDF()">📄 Rapport PDF résultats</button>`
   };
   $('topbar-actions').innerHTML=actions[id]||'';
@@ -1032,6 +1139,8 @@ function showPanel(id){
   else if(id==='factures')renderGallery();
   else if(id==='dep')renderDep();
   else if(id==='rev'){renderRev();}
+  else if(id==='loc')renderLoc();
+  else if(id==='hyp')renderHyp();
   else if(id==='res')renderRes();
 }
 
@@ -1049,6 +1158,7 @@ function renderRail(){
   const imm=activeImm();
   $('cnt-dep').textContent=imm?(imm.depenses||[]).length:0;
   $('cnt-rev').textContent=imm?(imm.revenus||[]).length:0;
+  if($('cnt-loc'))$('cnt-loc').textContent=imm?(imm.locataires||[]).length:0;
 }
 
 function setActive(id){
@@ -1859,6 +1969,263 @@ function saveKey(){
 if(getApiKey()){$('api-input').value='sk-…(enregistrée)';$('api-status').textContent='✓ Active';$('api-status').style.color='#34a367';}
 
 // ══════════════════════════════════════════════════
+// LOCATAIRES
+// ══════════════════════════════════════════════════
+let editLocId=null;
+function renderLoc(){
+  const imm=activeImm();
+  if(!imm){$('loc-content').innerHTML='<div class="empty">Sélectionnez un immeuble</div>';return;}
+  if(!imm.locataires)imm.locataires=[];
+  const locs=imm.locataires;
+  if(!locs.length){
+    $('loc-content').innerHTML=`<div class="empty" style="padding:3rem"><div style="font-size:3rem;margin-bottom:.5rem">👥</div><div style="font-size:14px;color:var(--ink2);margin-bottom:.5rem">Aucun locataire pour cet immeuble</div><div style="font-size:12px;color:var(--ink3)">Cliquez « + Ajouter locataire » pour commencer</div></div>`;
+    if($('cnt-loc'))$('cnt-loc').textContent=0;
+    return;
+  }
+  const MOIS=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  let html='';
+  locs.forEach(loc=>{
+    if(!loc.paiements)loc.paiements={};
+    const yearKey=String(activeYear);
+    if(!loc.paiements[yearKey])loc.paiements[yearKey]=[false,false,false,false,false,false,false,false,false,false,false,false];
+    const pays=loc.paiements[yearKey];
+    const paid=pays.filter(p=>p).length;
+    const total=(loc.loyer||0)*12;
+    const collected=(loc.loyer||0)*paid;
+    html+=`<div class="loc-card">
+      <div class="loc-header">
+        <div>
+          <div class="loc-name">${loc.prenom||''} ${loc.nom||''}</div>
+          <div class="loc-unit">${loc.unite?'Logement '+loc.unite:''} ${loc.loyer?'· '+fmt(loc.loyer)+'/mois':''}</div>
+        </div>
+        <div class="loc-actions">
+          <button onclick="openLocModal('${loc.id}')" title="Modifier">✏️</button>
+          <button onclick="deleteLoc('${loc.id}')" title="Supprimer">🗑️</button>
+        </div>
+      </div>
+      <div class="loc-info">
+        ${loc.email?`<div class="loc-info-item"><span class="lbl">Courriel</span><a href="mailto:${loc.email}" class="val">${loc.email}</a></div>`:''}
+        ${loc.tel?`<div class="loc-info-item"><span class="lbl">Téléphone</span><a href="tel:${loc.tel}" class="val">${loc.tel}</a></div>`:''}
+        ${loc.debut?`<div class="loc-info-item"><span class="lbl">Début du bail</span><span class="val">${loc.debut}</span></div>`:''}
+      </div>
+      ${loc.notes?`<div style="font-size:12px;color:var(--ink3);background:var(--surf2);padding:.5rem;border-radius:var(--rs);margin-bottom:.75rem">📝 ${loc.notes}</div>`:''}
+      <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:6px">Loyers ${activeYear}</div>
+      <div class="loc-months">
+        ${pays.map((p,i)=>`<div class="loc-month ${p?'paid':''}" onclick="toggleLoyer('${loc.id}',${i})"><span class="month-name">${MOIS[i]}</span><span class="month-check">${p?'✓':'○'}</span></div>`).join('')}
+      </div>
+      <div class="loc-progress">
+        <span><strong>${paid}/12</strong> mois payés</span>
+        <span>Encaissé : <strong style="color:var(--grn)">${fmt(collected)}</strong> / ${fmt(total)}</span>
+      </div>
+    </div>`;
+  });
+  $('loc-content').innerHTML=html;
+  if($('cnt-loc'))$('cnt-loc').textContent=locs.length;
+}
+
+function toggleLoyer(locId,monthIdx){
+  const imm=activeImm();if(!imm)return;
+  const loc=imm.locataires.find(l=>l.id===locId);if(!loc)return;
+  if(!loc.paiements)loc.paiements={};
+  const y=String(activeYear);
+  if(!loc.paiements[y])loc.paiements[y]=[false,false,false,false,false,false,false,false,false,false,false,false];
+  loc.paiements[y][monthIdx]=!loc.paiements[y][monthIdx];
+  save();renderLoc();
+}
+
+function openLocModal(id){
+  editLocId=id||null;
+  if(id){
+    const imm=activeImm();const loc=imm?.locataires?.find(l=>l.id===id);
+    if(loc){
+      $('loc-modal-title').textContent='Modifier le locataire';
+      $('loc-prenom').value=loc.prenom||'';
+      $('loc-nom').value=loc.nom||'';
+      $('loc-email').value=loc.email||'';
+      $('loc-tel').value=loc.tel||'';
+      $('loc-unite').value=loc.unite||'';
+      $('loc-loyer').value=loc.loyer||'';
+      $('loc-debut').value=loc.debut||'';
+      $('loc-notes').value=loc.notes||'';
+    }
+  }else{
+    $('loc-modal-title').textContent='Ajouter un locataire';
+    ['loc-prenom','loc-nom','loc-email','loc-tel','loc-unite','loc-loyer','loc-debut','loc-notes'].forEach(id=>{const e=$(id);if(e)e.value='';});
+  }
+  $('ov-loc').classList.add('open');
+}
+function closeLocModal(){$('ov-loc').classList.remove('open');editLocId=null;}
+
+function saveLoc(){
+  const imm=activeImm();if(!imm){toast('Sélectionnez un immeuble','err');return;}
+  if(!imm.locataires)imm.locataires=[];
+  const prenom=$('loc-prenom').value.trim();
+  const nom=$('loc-nom').value.trim();
+  if(!prenom&&!nom){toast('Nom ou prénom requis','err');return;}
+  const data={prenom,nom,email:$('loc-email').value.trim(),tel:$('loc-tel').value.trim(),unite:$('loc-unite').value.trim(),loyer:parseFloat($('loc-loyer').value)||0,debut:$('loc-debut').value,notes:$('loc-notes').value.trim()};
+  if(editLocId){
+    imm.locataires=imm.locataires.map(l=>l.id===editLocId?{...l,...data}:l);
+    toast('Locataire modifié','ok');
+  }else{
+    imm.locataires.push({id:uid(),...data,paiements:{}});
+    toast('Locataire ajouté','ok');
+  }
+  save();renderLoc();closeLocModal();
+}
+
+function deleteLoc(id){
+  const imm=activeImm();if(!imm)return;
+  const loc=imm.locataires.find(l=>l.id===id);
+  if(!confirm(`Supprimer le locataire "${loc?.prenom||''} ${loc?.nom||''}"?`))return;
+  imm.locataires=imm.locataires.filter(l=>l.id!==id);
+  save();renderLoc();toast('Locataire supprimé');
+}
+
+// ══════════════════════════════════════════════════
+// HYPOTHÈQUE
+// ══════════════════════════════════════════════════
+function calcPaiementMensuel(solde,tauxAnnuel,annees){
+  if(!solde||!tauxAnnuel||!annees)return 0;
+  const r=tauxAnnuel/100/12;
+  const n=annees*12;
+  return solde*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);
+}
+
+function calcSoldeActuel(hyp){
+  if(!hyp||!hyp.soldeInitial||!hyp.taux||!hyp.debut||!hyp.paiement)return hyp?.soldeInitial||0;
+  const debut=new Date(hyp.debut);
+  const maintenant=new Date();
+  const moisEcoules=(maintenant.getFullYear()-debut.getFullYear())*12+(maintenant.getMonth()-debut.getMonth());
+  if(moisEcoules<=0)return hyp.soldeInitial;
+  let solde=hyp.soldeInitial;
+  const tauxMensuel=hyp.taux/100/12;
+  for(let i=0;i<moisEcoules;i++){
+    if(solde<=0)break;
+    const interets=solde*tauxMensuel;
+    const capital=hyp.paiement-interets;
+    solde-=capital;
+  }
+  return Math.max(0,solde);
+}
+
+function genAmortissement(hyp,nbMois=12){
+  if(!hyp||!hyp.soldeInitial||!hyp.taux||!hyp.paiement||!hyp.debut)return [];
+  const rows=[];
+  let solde=hyp.soldeInitial;
+  const tauxMensuel=hyp.taux/100/12;
+  const debut=new Date(hyp.debut);
+  const maintenant=new Date();
+  const moisEcoules=(maintenant.getFullYear()-debut.getFullYear())*12+(maintenant.getMonth()-debut.getMonth());
+
+  // Fast-forward to current month
+  for(let i=0;i<moisEcoules;i++){
+    if(solde<=0)break;
+    const interets=solde*tauxMensuel;
+    const capital=hyp.paiement-interets;
+    solde-=capital;
+  }
+
+  // Generate next nbMois
+  for(let i=0;i<nbMois;i++){
+    if(solde<=0)break;
+    const interets=solde*tauxMensuel;
+    const capital=Math.min(hyp.paiement-interets,solde);
+    solde-=capital;
+    const d=new Date(maintenant.getFullYear(),maintenant.getMonth()+i,1);
+    rows.push({date:d.toISOString().slice(0,7),paiement:hyp.paiement,capital,interets,solde});
+  }
+  return rows;
+}
+
+function renderHyp(){
+  const imm=activeImm();
+  if(!imm){$('hyp-content').innerHTML='<div class="empty">Sélectionnez un immeuble</div>';return;}
+  const hyp=imm.hypotheque;
+  if(!hyp||!hyp.soldeInitial){
+    $('hyp-content').innerHTML=`<div class="hyp-empty"><div class="hyp-empty-icon">🏦</div><div style="font-size:14px;color:var(--ink2);font-weight:600;margin-bottom:.375rem">Aucune hypothèque configurée</div><div style="font-size:12px;color:var(--ink3);margin-bottom:1rem">Cliquez « ⚙ Configurer » pour entrer les détails de votre hypothèque</div></div>`;
+    return;
+  }
+  const soldeActuel=calcSoldeActuel(hyp);
+  const valeur=hyp.valeurMarchande||0;
+  const equity=valeur-soldeActuel;
+  const equityPct=valeur>0?(equity/valeur)*100:0;
+  const debtPct=valeur>0?(soldeActuel/valeur)*100:0;
+  const capitalRembourse=hyp.soldeInitial-soldeActuel;
+  const amort=genAmortissement(hyp,12);
+  const MOIS_FR=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+  $('hyp-content').innerHTML=`
+    <div class="hyp-grid">
+      <div class="hyp-card"><div class="lbl">💰 Valeur marchande</div><div class="val">${fmt(valeur)}</div><div class="sub">Valeur estimée actuelle</div></div>
+      <div class="hyp-card debt"><div class="lbl">📉 Solde hypothécaire</div><div class="val">${fmt(soldeActuel)}</div><div class="sub">Calculé automatiquement</div></div>
+      <div class="hyp-card equity"><div class="lbl">📈 Équité (valeur nette)</div><div class="val">${fmt(equity)}</div><div class="sub">${equityPct.toFixed(1)}% de la valeur</div></div>
+      <div class="hyp-card"><div class="lbl">💵 Capital remboursé</div><div class="val" style="color:var(--blu-m)">${fmt(capitalRembourse)}</div><div class="sub">Depuis le début du prêt</div></div>
+    </div>
+
+    <div class="hyp-bar">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:8px;font-weight:600">
+        <span>Équité (à vous) : ${equityPct.toFixed(1)}%</span>
+        <span>Dette : ${debtPct.toFixed(1)}%</span>
+      </div>
+      <div class="hyp-bar-track">
+        <div class="hyp-bar-equity" style="width:${equityPct}%">${equityPct>15?fmt(equity):''}</div>
+        <div class="hyp-bar-debt" style="width:${debtPct}%">${debtPct>15?fmt(soldeActuel):''}</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1rem;margin-bottom:1rem;display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;font-size:13px">
+      <div><span style="font-size:11px;color:var(--ink3);text-transform:uppercase;display:block;margin-bottom:2px">Taux</span><strong>${hyp.taux}%</strong></div>
+      <div><span style="font-size:11px;color:var(--ink3);text-transform:uppercase;display:block;margin-bottom:2px">Paiement mensuel</span><strong>${fmt(hyp.paiement)}</strong></div>
+      <div><span style="font-size:11px;color:var(--ink3);text-transform:uppercase;display:block;margin-bottom:2px">Amortissement</span><strong>${hyp.amortissement} ans</strong></div>
+      <div><span style="font-size:11px;color:var(--ink3);text-transform:uppercase;display:block;margin-bottom:2px">Début du prêt</span><strong>${hyp.debut||'—'}</strong></div>
+    </div>
+
+    <div style="margin-top:1.5rem;font-size:14px;font-weight:600;color:var(--ink);margin-bottom:8px">📅 Calendrier des 12 prochains paiements</div>
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden">
+      <table class="hyp-table">
+        <thead><tr><th>Mois</th><th class="r">Paiement</th><th class="r">Capital</th><th class="r">Intérêts</th><th class="r">Solde après</th></tr></thead>
+        <tbody>
+          ${amort.map(r=>{const[y,m]=r.date.split('-');return `<tr>
+            <td>${MOIS_FR[parseInt(m)-1]} ${y}</td>
+            <td class="r">${fmt(r.paiement)}</td>
+            <td class="r cap">${fmt(r.capital)}</td>
+            <td class="r int">${fmt(r.interets)}</td>
+            <td class="r">${fmt(r.solde)}</td>
+          </tr>`}).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function openHypModal(){
+  const imm=activeImm();if(!imm){toast('Sélectionnez un immeuble','err');return;}
+  const hyp=imm.hypotheque||{};
+  $('hyp-valeur').value=hyp.valeurMarchande||'';
+  $('hyp-solde').value=hyp.soldeInitial||'';
+  $('hyp-taux').value=hyp.taux||'';
+  $('hyp-amort').value=hyp.amortissement||25;
+  $('hyp-paiement').value=hyp.paiement||'';
+  $('hyp-debut').value=hyp.debut||'';
+  $('ov-hyp').classList.add('open');
+}
+function closeHypModal(){$('ov-hyp').classList.remove('open');}
+
+function saveHyp(){
+  const imm=activeImm();if(!imm)return;
+  const valeur=parseFloat($('hyp-valeur').value)||0;
+  const solde=parseFloat($('hyp-solde').value)||0;
+  const taux=parseFloat($('hyp-taux').value)||0;
+  const amort=parseInt($('hyp-amort').value)||25;
+  let paiement=parseFloat($('hyp-paiement').value)||0;
+  const debut=$('hyp-debut').value;
+  if(!solde||!taux){toast('Solde et taux requis','err');return;}
+  if(!paiement)paiement=calcPaiementMensuel(solde,taux,amort);
+  imm.hypotheque={valeurMarchande:valeur,soldeInitial:solde,taux,amortissement:amort,paiement,debut};
+  save();renderHyp();closeHypModal();
+  toast('Hypothèque enregistrée','ok');
+}
+
+// ══════════════════════════════════════════════════
 // CSV EXPORT
 // ══════════════════════════════════════════════════
 function exportCSV(type){
@@ -1890,7 +2257,7 @@ function toast(msg,type=''){
 // ══════════════════════════════════════════════════
 // KEYBOARD
 // ══════════════════════════════════════════════════
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();}});
 
 // ══════════════════════════════════════════════════
 // GOOGLE DRIVE
