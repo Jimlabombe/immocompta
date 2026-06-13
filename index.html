@@ -667,6 +667,7 @@ tbody tr:hover{background:var(--surf2)}
         <div class="fg"><label>Montant HT ($)</label><input type="number" id="md-mont" step="0.01" min="0" oninput="updMT()"></div>
         <div class="fg"><label>TPS/TVQ ($)</label><input type="number" id="md-tax" step="0.01" min="0" oninput="updMT()"></div>
         <div class="fg"><label>Total TTC</label><input type="text" id="md-ttc" readonly style="background:var(--surf2);color:var(--ink3)"></div>
+        <div class="fg"><label>Payé par 🤝</label><select id="md-payepar"><option value="">— Compte commun —</option><option value="Jim">Jim</option><option value="Antoine">Antoine</option><option value="Jean-Christophe">Jean-Christophe</option></select></div>
         <div class="fg full"><label>Notes</label><textarea id="md-notes"></textarea></div>
       </div>
     </div>
@@ -1575,7 +1576,7 @@ function openMan(type){
   $('man-dep-form').style.display=type==='dep'?'block':'none';
   $('man-rev-form').style.display=type==='rev'?'block':'none';
   $('man-title').textContent=type==='dep'?'Nouvelle dépense':'Nouveau revenu';
-  ['md-date','md-four','md-desc','md-mont','md-tax','md-notes','mr-date','mr-src','mr-desc','mr-mont','mr-unite','mr-recu','mr-notes'].forEach(id=>{const el=$(id);if(el)el.value='';});
+  ['md-date','md-four','md-desc','md-mont','md-tax','md-notes','md-payepar','mr-date','mr-src','mr-desc','mr-mont','mr-unite','mr-recu','mr-notes'].forEach(id=>{const el=$(id);if(el)el.value='';});
   ['md-cat','mr-cat'].forEach(id=>{const el=$(id);if(el)el.value='';});
   $('md-ttc').value='';
   $('ov-man').classList.add('open');
@@ -1593,6 +1594,7 @@ function openEditDep(id){
   $('man-title').textContent='Modifier la dépense';
   $('md-date').value=d.date||'';$('md-four').value=d.fournisseur||'';$('md-desc').value=d.desc||'';
   $('md-cat').value=d.cat||'';$('md-mont').value=d.montant||'';$('md-tax').value=d.tax||'';
+  $('md-payepar').value=d.payepar||'';
   $('md-notes').value=d.notes||'';updMT();
   $('ov-man').classList.add('open');
 }
@@ -1612,7 +1614,7 @@ function saveMan(){
   if(manType==='dep'){
     const date=$('md-date').value,desc=$('md-desc').value.trim(),mont=parseFloat($('md-mont').value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return;}
-    const obj={id:editId||uid(),date,desc,cat:$('md-cat').value,fournisseur:$('md-four').value.trim(),montant:mont,tax:parseFloat($('md-tax').value)||0,notes:$('md-notes').value.trim()};
+    const obj={id:editId||uid(),date,desc,cat:$('md-cat').value,fournisseur:$('md-four').value.trim(),montant:mont,tax:parseFloat($('md-tax').value)||0,payepar:$('md-payepar').value||'',notes:$('md-notes').value.trim()};
     // For new entries only, init receipt fields
     if(!editId){obj.receipt=null;obj.receiptName='';}
     // For edits, the spread will preserve existing receipt/receiptName/receiptPath
@@ -1913,6 +1915,10 @@ function buildScanForm(type,d){
       </div>
     </div>
     <div class="fg" style="margin-top:.75rem">
+      <label>Payé par 🤝</label>
+      <select id="sd-payepar"><option value="">— Compte commun —</option><option value="Jim">Jim</option><option value="Antoine">Antoine</option><option value="Jean-Christophe">Jean-Christophe</option></select>
+    </div>
+    <div class="fg" style="margin-top:.75rem">
       <label>Notes</label>
       <textarea id="sd-notes" style="min-height:48px">${d.notes||''}</textarea>
     </div>`;
@@ -1956,7 +1962,7 @@ async function saveScanEntry(){
   if(isDepense){
     const date=$('sd-date')?.value,desc=$('sd-desc')?.value?.trim(),mont=parseFloat($('sd-mont')?.value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return false;}
-    entryData={id:uid(),date,desc,cat:$('sd-cat')?.value||'',fournisseur:$('sd-four')?.value?.trim()||'',montant:mont,tax:parseFloat($('sd-tax')?.value)||0,notes:$('sd-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||''};
+    entryData={id:uid(),date,desc,cat:$('sd-cat')?.value||'',fournisseur:$('sd-four')?.value?.trim()||'',montant:mont,tax:parseFloat($('sd-tax')?.value)||0,payepar:$('sd-payepar')?.value||'',notes:$('sd-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||''};
   }else{
     const date=$('sr-date')?.value,desc=$('sr-desc')?.value?.trim(),mont=parseFloat($('sr-mont')?.value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return false;}
@@ -2458,44 +2464,48 @@ function renderRemb(){
   const partners=['Jim','Antoine','Jean-Christophe'];
   const PARTNER_COLORS={Jim:'#3b82f6',Antoine:'#10b981','Jean-Christophe':'#f59e0b',Commun:'#9090b0'};
 
-  // Filter transactions by active year
+  // ── 1) Depenses from accounting (with payepar) — filtered by year ──
+  const paid={Jim:0,Antoine:0,'Jean-Christophe':0,Commun:0};
+  const deps=filterByYear(imm.depenses||[]);
+  deps.forEach(d=>{
+    const total=(d.montant||0)+(d.tax||0);
+    const who=d.payepar||'Commun';
+    paid[who]=(paid[who]||0)+total;
+  });
+
+  // ── 2) Manual remboursements (filtered by year) ──
   const allRembs=imm.remboursements||[];
   const rembs=allRembs.filter(r=>r.date&&r.date.startsWith(String(activeYear)));
-
-  // Calculate balances from manual entries only
-  const paid={Jim:0,Antoine:0,'Jean-Christophe':0,Commun:0};
-  let totalShared=0;
   rembs.forEach(r=>{
     if(r.type==='depense'){
       const who=r.payepar||'Commun';
       paid[who]=(paid[who]||0)+(r.montant||0);
-      totalShared+=(r.montant||0);
     }
   });
 
-  // Theoretical share per partner
+  const totalShared=paid.Jim+paid.Antoine+paid['Jean-Christophe']+paid.Commun;
+  // Theoretical share per partner — applied on TOTAL (incl. compte commun)
   const share={
     Jim:totalShared*(parts.Jim||0)/100,
     Antoine:totalShared*(parts.Antoine||0)/100,
     'Jean-Christophe':totalShared*(parts['Jean-Christophe']||0)/100
   };
-
-  // Balance from shared expenses: positive = others owe them
+  // Balance: positive = others owe them
   const balance={
     Jim:paid.Jim-share.Jim,
     Antoine:paid.Antoine-share.Antoine,
     'Jean-Christophe':paid['Jean-Christophe']-share['Jean-Christophe']
   };
 
-  // Apply transfers (Jim → Antoine: 100$ means Jim's debt decreases by 100, Antoine's credit decreases by 100)
+  // ── 3) Apply direct transfers ──
   rembs.forEach(r=>{
     if(r.type==='transfert'){
-      balance[r.from]=(balance[r.from]||0)+(r.montant||0); // Jim donated → balance va vers + (sa dette diminue)
-      balance[r.to]=(balance[r.to]||0)-(r.montant||0);    // Antoine reçu → balance va vers − (son crédit diminue)
+      balance[r.from]=(balance[r.from]||0)+(r.montant||0);
+      balance[r.to]=(balance[r.to]||0)-(r.montant||0);
     }
   });
 
-  // Compute settlement transfers
+  // ── 4) Settlement transfers ──
   const transfers=[];
   const creditors=partners.filter(p=>balance[p]>0.01).map(p=>({name:p,amount:balance[p]}));
   const debtors=partners.filter(p=>balance[p]<-0.01).map(p=>({name:p,amount:-balance[p]}));
@@ -2511,8 +2521,11 @@ function renderRemb(){
     if(creditors[j].amount<0.01)j++;
   }
 
-  // Sort manual list by date desc
   const list=[...rembs].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  // Count auto vs manual
+  const nbAuto=deps.filter(d=>d.payepar).length;
+  const nbAutoCommun=deps.filter(d=>!d.payepar).length;
 
   $('remb-content').innerHTML=`
     <!-- Parts -->
@@ -2520,7 +2533,7 @@ function renderRemb(){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <div>
           <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;font-weight:600">Parts de propriété — ${imm.name}</div>
-          <div style="font-size:13px;color:var(--ink2);margin-top:2px">Total dépenses partagées ${activeYear} : <strong>${fmt(totalShared)}</strong></div>
+          <div style="font-size:13px;color:var(--ink2);margin-top:2px">Total dépenses ${activeYear} : <strong>${fmt(totalShared)}</strong> <span style="color:var(--ink3);font-size:11px">(${nbAuto} dépenses comptables avec payeur · ${nbAutoCommun} compte commun · ${rembs.filter(r=>r.type==='depense').length} ajouts manuels)</span></div>
         </div>
         <button class="btn btn-out btn-sm" onclick="openPartsModal()">⚙ Modifier</button>
       </div>
@@ -2533,7 +2546,7 @@ function renderRemb(){
       </div>
     </div>
 
-    <!-- Détail des paiements -->
+    <!-- Soldes -->
     <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem">
       <div style="font-size:14px;font-weight:600;margin-bottom:.75rem">💰 Soldes (${activeYear})</div>
       <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -2545,10 +2558,10 @@ function renderRemb(){
             const balLabel=bal>0.01?'+ '+fmt(bal):bal<-0.01?'- '+fmt(-bal):fmt(0);
             return `<tr style="border-bottom:1px solid var(--bdr)"><td style="padding:10px 12px"><span style="display:inline-block;width:10px;height:10px;border-radius:99px;background:${PARTNER_COLORS[p]};margin-right:8px"></span>${p}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums">${fmt(paid[p])}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink3)">${fmt(share[p])}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:${balColor};font-weight:700">${balLabel}</td></tr>`;
           }).join('')}
-          ${paid.Commun>0?`<tr style="border-bottom:1px solid var(--bdr);background:var(--surf2)"><td style="padding:10px 12px;color:var(--ink3);font-style:italic">⚪ Compte commun</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink3)">${fmt(paid.Commun)}</td><td colspan="2" style="padding:10px 12px;text-align:right;font-size:11px;color:var(--ink3)">Non réparti</td></tr>`:''}
+          ${paid.Commun>0?`<tr style="border-bottom:1px solid var(--bdr);background:var(--surf2)"><td style="padding:10px 12px;color:var(--ink3);font-style:italic">⚪ Compte commun</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink3)">${fmt(paid.Commun)}</td><td colspan="2" style="padding:10px 12px;text-align:right;font-size:11px;color:var(--ink3)">Réparti selon les %</td></tr>`:''}
         </tbody>
       </table>
-      <div style="font-size:11px;color:var(--ink3);margin-top:.5rem;font-style:italic">💡 Solde positif = les autres lui doivent. Solde négatif = il doit aux autres. Les transferts directs ajustent automatiquement ces soldes.</div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:.5rem;font-style:italic">💡 Inclut automatiquement les dépenses comptables avec "Payé par" + les dépenses manuelles. Les transferts directs ajustent les soldes.</div>
     </div>
 
     <!-- Qui doit à qui -->
@@ -2566,7 +2579,7 @@ function renderRemb(){
         </div>`).join('')}
     </div>
 
-    <!-- Liste des transactions -->
+    <!-- Liste des transactions manuelles -->
     <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
         <div style="font-size:14px;font-weight:600">📋 Transactions manuelles (${list.length})</div>
@@ -2575,8 +2588,9 @@ function renderRemb(){
           <button class="btn btn-ink btn-xs" onclick="openRembModal('transfert')">🔄 Transfert</button>
         </div>
       </div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:.5rem;font-style:italic">Ces transactions n'apparaissent PAS dans les dépenses comptables.</div>
       ${list.length===0?
-        `<div style="text-align:center;padding:1.5rem;color:var(--ink3);font-size:13px">Aucune transaction pour ${activeYear} — cliquez les boutons ci-dessus pour en ajouter</div>`:
+        `<div style="text-align:center;padding:1.5rem;color:var(--ink3);font-size:13px">Aucune transaction manuelle pour ${activeYear}</div>`:
         `<table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr style="background:var(--surf2)"><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Date</th><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Type</th><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Détails</th><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Description</th><th style="text-align:right;padding:8px 12px;font-size:11px;text-transform:uppercase">Montant</th><th></th></tr></thead>
           <tbody>
