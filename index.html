@@ -377,6 +377,7 @@ tbody tr:hover{background:var(--surf2)}
   <button class="rail-btn" id="nav-res" onclick="showPanel('res')"><span class="ic">📊</span> État des résultats</button>
   <button class="rail-btn" id="nav-loc" onclick="showPanel('loc')"><span class="ic">👥</span> Locataires <span class="cnt" id="cnt-loc">0</span></button>
   <button class="rail-btn" id="nav-hyp" onclick="showPanel('hyp')"><span class="ic">🏦</span> Hypothèque</button>
+  <button class="rail-btn" id="nav-remb" onclick="showPanel('remb')"><span class="ic">🤝</span> Remboursements</button>
 
   <div class="sep" style="margin:.5rem .75rem"></div>
   <div class="rail-section">Mes immeubles</div>
@@ -612,6 +613,11 @@ tbody tr:hover{background:var(--surf2)}
       <div id="hyp-content"></div>
     </div>
 
+    <!-- ═══════════════════ PANEL REMBOURSEMENTS ═══════════════════ -->
+    <div class="panel" id="panel-remb">
+      <div id="remb-content"></div>
+    </div>
+
   </div>
 </div>
 </div>
@@ -661,6 +667,7 @@ tbody tr:hover{background:var(--surf2)}
         <div class="fg"><label>Montant HT ($)</label><input type="number" id="md-mont" step="0.01" min="0" oninput="updMT()"></div>
         <div class="fg"><label>TPS/TVQ ($)</label><input type="number" id="md-tax" step="0.01" min="0" oninput="updMT()"></div>
         <div class="fg"><label>Total TTC</label><input type="text" id="md-ttc" readonly style="background:var(--surf2);color:var(--ink3)"></div>
+        <div class="fg"><label>Payé par 🤝</label><select id="md-payepar"><option value="">— Compte commun —</option><option value="Jim">Jim</option><option value="Antoine">Antoine</option><option value="Jean-Christophe">Jean-Christophe</option></select></div>
         <div class="fg full"><label>Notes</label><textarea id="md-notes"></textarea></div>
       </div>
     </div>
@@ -762,6 +769,27 @@ tbody tr:hover{background:var(--surf2)}
     </div>
   </div>
   <div class="mf"><button class="btn btn-out" onclick="closeHypModal()">Annuler</button><button class="btn btn-ink" onclick="saveHyp()">✓ Enregistrer</button></div>
+</div>
+</div>
+
+<!-- ══ MODAL PARTS DE PROPRIÉTÉ ══ -->
+<div class="overlay" id="ov-parts" onclick="if(event.target.id==='ov-parts')closePartsModal()">
+<div class="modal narrow">
+  <div class="mh"><h2>Parts de propriété — <span id="parts-imm-name"></span></h2><button class="xbtn" onclick="closePartsModal()">×</button></div>
+  <div class="mb">
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:1rem;background:var(--blu-l);padding:.75rem;border-radius:var(--rs);border-left:3px solid var(--blu-m)">
+      Définissez le pourcentage de propriété de chaque partenaire pour cet immeuble. Le total doit faire 100%.
+    </p>
+    <div class="fgrid">
+      <div class="fg"><label>Jim (%)</label><input type="number" id="part-jim" step="0.01" min="0" max="100" placeholder="33.33" oninput="updPartTotal()"></div>
+      <div class="fg"><label>Antoine (%)</label><input type="number" id="part-ant" step="0.01" min="0" max="100" placeholder="33.33" oninput="updPartTotal()"></div>
+      <div class="fg full"><label>Jean-Christophe (%)</label><input type="number" id="part-jc" step="0.01" min="0" max="100" placeholder="33.34" oninput="updPartTotal()"></div>
+    </div>
+    <div id="part-total-box" style="margin-top:.75rem;padding:.625rem;border-radius:var(--rs);font-size:13px;font-weight:600;text-align:center">
+      Total : <span id="part-total">0</span>%
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-out" onclick="closePartsModal()">Annuler</button><button class="btn btn-ink" onclick="saveParts()">✓ Enregistrer</button></div>
 </div>
 </div>
 
@@ -1119,7 +1147,7 @@ function showPanel(id){
   document.querySelectorAll('.rail-btn').forEach(b=>b.classList.remove('active'));
   const nb=$('nav-'+id);if(nb)nb.classList.add('active');
 
-  const titles={global:'Tous les immeubles',factures:'Galerie des factures',dep:'Dépenses',rev:'Revenus',loc:'Locataires',hyp:'Hypothèque & valeur',res:'Résultats'};
+  const titles={global:'Tous les immeubles',factures:'Galerie des factures',dep:'Dépenses',rev:'Revenus',loc:'Locataires',hyp:'Hypothèque & valeur',remb:'Remboursements entre partenaires',res:'Résultats'};
   $('topbar-title').textContent=titles[id]||'';
   const imm=activeImm();
   $('topbar-sub').textContent=(id!=='global'&&id!=='factures'&&imm)?'— '+imm.name+' '+activeYear:'';
@@ -1132,6 +1160,7 @@ function showPanel(id){
     rev:`<button class="btn btn-out btn-sm" onclick="exportCSV('rev')">⬇ CSV</button><button class="btn btn-out btn-sm" onclick="genPDF('rev')">📄 Rapport PDF</button><button class="btn btn-pur btn-sm" onclick="openBail()">📅 Générer loyers en avance</button><button class="btn btn-ink btn-sm" onclick="openMan('rev')">+ Revenu</button>`,
     loc:`<button class="btn btn-ink btn-sm" onclick="openLocModal()">+ Ajouter locataire</button>`,
     hyp:`<button class="btn btn-ink btn-sm" onclick="openHypModal()">⚙ Configurer</button>`,
+    remb:`<button class="btn btn-out btn-sm" onclick="openPartsModal()">⚙ Configurer les parts</button>`,
     res:`<button class="btn btn-out btn-sm" onclick="genResPDF()">📄 Rapport PDF résultats</button>`
   };
   $('topbar-actions').innerHTML=actions[id]||'';
@@ -1142,6 +1171,7 @@ function showPanel(id){
   else if(id==='rev'){renderRev();}
   else if(id==='loc')renderLoc();
   else if(id==='hyp')renderHyp();
+  else if(id==='remb')renderRemb();
   else if(id==='res')renderRes();
 }
 
@@ -1503,7 +1533,7 @@ function openMan(type){
   $('man-dep-form').style.display=type==='dep'?'block':'none';
   $('man-rev-form').style.display=type==='rev'?'block':'none';
   $('man-title').textContent=type==='dep'?'Nouvelle dépense':'Nouveau revenu';
-  ['md-date','md-four','md-desc','md-mont','md-tax','md-notes','mr-date','mr-src','mr-desc','mr-mont','mr-unite','mr-recu','mr-notes'].forEach(id=>{const el=$(id);if(el)el.value='';});
+  ['md-date','md-four','md-desc','md-mont','md-tax','md-notes','md-payepar','mr-date','mr-src','mr-desc','mr-mont','mr-unite','mr-recu','mr-notes'].forEach(id=>{const el=$(id);if(el)el.value='';});
   ['md-cat','mr-cat'].forEach(id=>{const el=$(id);if(el)el.value='';});
   $('md-ttc').value='';
   $('ov-man').classList.add('open');
@@ -1521,6 +1551,7 @@ function openEditDep(id){
   $('man-title').textContent='Modifier la dépense';
   $('md-date').value=d.date||'';$('md-four').value=d.fournisseur||'';$('md-desc').value=d.desc||'';
   $('md-cat').value=d.cat||'';$('md-mont').value=d.montant||'';$('md-tax').value=d.tax||'';
+  $('md-payepar').value=d.payepar||'';
   $('md-notes').value=d.notes||'';updMT();
   $('ov-man').classList.add('open');
 }
@@ -1540,7 +1571,7 @@ function saveMan(){
   if(manType==='dep'){
     const date=$('md-date').value,desc=$('md-desc').value.trim(),mont=parseFloat($('md-mont').value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return;}
-    const obj={id:editId||uid(),date,desc,cat:$('md-cat').value,fournisseur:$('md-four').value.trim(),montant:mont,tax:parseFloat($('md-tax').value)||0,notes:$('md-notes').value.trim(),receipt:null,receiptName:''};
+    const obj={id:editId||uid(),date,desc,cat:$('md-cat').value,fournisseur:$('md-four').value.trim(),montant:mont,tax:parseFloat($('md-tax').value)||0,payepar:$('md-payepar').value||'',notes:$('md-notes').value.trim(),receipt:null,receiptName:''};
     if(editId)imm.depenses=imm.depenses.map(d=>d.id===editId?{...d,...obj}:d);
     else imm.depenses.push(obj);
   }else{
@@ -1837,6 +1868,10 @@ function buildScanForm(type,d){
       </div>
     </div>
     <div class="fg" style="margin-top:.75rem">
+      <label>Payé par 🤝</label>
+      <select id="sd-payepar"><option value="">— Compte commun —</option><option value="Jim">Jim</option><option value="Antoine">Antoine</option><option value="Jean-Christophe">Jean-Christophe</option></select>
+    </div>
+    <div class="fg" style="margin-top:.75rem">
       <label>Notes</label>
       <textarea id="sd-notes" style="min-height:48px">${d.notes||''}</textarea>
     </div>`;
@@ -1880,7 +1915,7 @@ async function saveScanEntry(){
   if(isDepense){
     const date=$('sd-date')?.value,desc=$('sd-desc')?.value?.trim(),mont=parseFloat($('sd-mont')?.value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return false;}
-    entryData={id:uid(),date,desc,cat:$('sd-cat')?.value||'',fournisseur:$('sd-four')?.value?.trim()||'',montant:mont,tax:parseFloat($('sd-tax')?.value)||0,notes:$('sd-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||''};
+    entryData={id:uid(),date,desc,cat:$('sd-cat')?.value||'',fournisseur:$('sd-four')?.value?.trim()||'',montant:mont,tax:parseFloat($('sd-tax')?.value)||0,payepar:$('sd-payepar')?.value||'',notes:$('sd-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||''};
   }else{
     const date=$('sr-date')?.value,desc=$('sr-desc')?.value?.trim(),mont=parseFloat($('sr-mont')?.value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return false;}
@@ -2257,6 +2292,148 @@ function saveHyp(){
 }
 
 // ══════════════════════════════════════════════════
+// PARTS DE PROPRIÉTÉ
+// ══════════════════════════════════════════════════
+function updPartTotal(){
+  const j=parseFloat($('part-jim').value)||0;
+  const a=parseFloat($('part-ant').value)||0;
+  const c=parseFloat($('part-jc').value)||0;
+  const total=j+a+c;
+  $('part-total').textContent=total.toFixed(2);
+  const box=$('part-total-box');
+  if(Math.abs(total-100)<0.01){box.style.background='var(--grn-l)';box.style.color='var(--grn)';}
+  else{box.style.background='var(--red-l)';box.style.color='var(--red)';}
+}
+function openPartsModal(){
+  const imm=activeImm();if(!imm){toast('Sélectionnez un immeuble','err');return;}
+  $('parts-imm-name').textContent=imm.name;
+  const p=imm.parts||{Jim:33.33,Antoine:33.33,'Jean-Christophe':33.34};
+  $('part-jim').value=p.Jim||'';
+  $('part-ant').value=p.Antoine||'';
+  $('part-jc').value=p['Jean-Christophe']||'';
+  updPartTotal();
+  $('ov-parts').classList.add('open');
+}
+function closePartsModal(){$('ov-parts').classList.remove('open');}
+function saveParts(){
+  const imm=activeImm();if(!imm)return;
+  const j=parseFloat($('part-jim').value)||0;
+  const a=parseFloat($('part-ant').value)||0;
+  const c=parseFloat($('part-jc').value)||0;
+  const total=j+a+c;
+  if(Math.abs(total-100)>0.01){toast('Le total doit faire 100% (actuellement '+total.toFixed(2)+'%)','err');return;}
+  imm.parts={Jim:j,Antoine:a,'Jean-Christophe':c};
+  save();renderRemb();closePartsModal();
+  toast('Parts enregistrées','ok');
+}
+
+// ══════════════════════════════════════════════════
+// REMBOURSEMENTS ENTRE PARTENAIRES
+// ══════════════════════════════════════════════════
+function renderRemb(){
+  const imm=activeImm();
+  if(!imm){$('remb-content').innerHTML='<div class="empty">Sélectionnez un immeuble</div>';return;}
+  const parts=imm.parts||{Jim:33.33,Antoine:33.33,'Jean-Christophe':33.34};
+  const partners=['Jim','Antoine','Jean-Christophe'];
+
+  // Calculate who paid what
+  const paid={Jim:0,Antoine:0,'Jean-Christophe':0,Commun:0};
+  const deps=filterByYear(imm.depenses||[]);
+  deps.forEach(d=>{
+    const total=(d.montant||0)+(d.tax||0);
+    const who=d.payepar||'Commun';
+    paid[who]=(paid[who]||0)+total;
+  });
+
+  const totalDep=paid.Jim+paid.Antoine+paid['Jean-Christophe']+paid.Commun;
+  // Each partner's theoretical share of total expenses
+  const share={
+    Jim:totalDep*(parts.Jim||0)/100,
+    Antoine:totalDep*(parts.Antoine||0)/100,
+    'Jean-Christophe':totalDep*(parts['Jean-Christophe']||0)/100
+  };
+  // Net balance: positive = others owe them, negative = they owe others
+  const balance={
+    Jim:paid.Jim-share.Jim,
+    Antoine:paid.Antoine-share.Antoine,
+    'Jean-Christophe':paid['Jean-Christophe']-share['Jean-Christophe']
+  };
+
+  // Calculate transfers (simplified debt settlement)
+  const transfers=[];
+  const creditors=partners.filter(p=>balance[p]>0.01).map(p=>({name:p,amount:balance[p]}));
+  const debtors=partners.filter(p=>balance[p]<-0.01).map(p=>({name:p,amount:-balance[p]}));
+  // Sort by amount descending
+  creditors.sort((a,b)=>b.amount-a.amount);
+  debtors.sort((a,b)=>b.amount-a.amount);
+  let i=0,j=0;
+  while(i<debtors.length&&j<creditors.length){
+    const amt=Math.min(debtors[i].amount,creditors[j].amount);
+    if(amt>0.01){
+      transfers.push({from:debtors[i].name,to:creditors[j].name,amount:amt});
+    }
+    debtors[i].amount-=amt;
+    creditors[j].amount-=amt;
+    if(debtors[i].amount<0.01)i++;
+    if(creditors[j].amount<0.01)j++;
+  }
+
+  const PARTNER_COLORS={Jim:'#3b82f6',Antoine:'#10b981','Jean-Christophe':'#f59e0b',Commun:'#9090b0'};
+
+  $('remb-content').innerHTML=`
+    <!-- KPIs Parts -->
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div>
+          <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;font-weight:600">Parts de propriété — ${imm.name}</div>
+          <div style="font-size:13px;color:var(--ink2);margin-top:2px">Total dépenses ${activeYear} : <strong>${fmt(totalDep)}</strong></div>
+        </div>
+        <button class="btn btn-out btn-sm" onclick="openPartsModal()">⚙ Modifier</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem">
+        ${partners.map(p=>`<div style="background:var(--surf2);border-radius:var(--rs);padding:.75rem;border-left:3px solid ${PARTNER_COLORS[p]}">
+          <div style="font-size:11px;color:var(--ink3);text-transform:uppercase">${p}</div>
+          <div style="font-size:1.4rem;font-weight:700;margin-top:2px">${(parts[p]||0).toFixed(2)}%</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:2px">Part théorique : ${fmt(share[p])}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Détail des paiements -->
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.75rem">💰 Détail des paiements (${activeYear})</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:var(--surf2)"><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Partenaire</th><th style="text-align:right;padding:8px 12px;font-size:11px;text-transform:uppercase">A payé</th><th style="text-align:right;padding:8px 12px;font-size:11px;text-transform:uppercase">Devrait payer</th><th style="text-align:right;padding:8px 12px;font-size:11px;text-transform:uppercase">Solde</th></tr></thead>
+        <tbody>
+          ${partners.map(p=>{
+            const bal=balance[p];
+            const balColor=bal>0.01?'var(--grn)':bal<-0.01?'var(--red)':'var(--ink3)';
+            const balLabel=bal>0.01?'+ '+fmt(bal):bal<-0.01?'- '+fmt(-bal):fmt(0);
+            return `<tr style="border-bottom:1px solid var(--bdr)"><td style="padding:10px 12px"><span style="display:inline-block;width:10px;height:10px;border-radius:99px;background:${PARTNER_COLORS[p]};margin-right:8px"></span>${p}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums">${fmt(paid[p])}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink3)">${fmt(share[p])}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:${balColor};font-weight:700">${balLabel}</td></tr>`;
+          }).join('')}
+          ${paid.Commun>0?`<tr style="border-bottom:1px solid var(--bdr);background:var(--surf2)"><td style="padding:10px 12px;color:var(--ink3);font-style:italic">⚪ Compte commun</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink3)">${fmt(paid.Commun)}</td><td colspan="2" style="padding:10px 12px;text-align:right;font-size:11px;color:var(--ink3)">Réparti selon les %</td></tr>`:''}
+        </tbody>
+      </table>
+      <div style="font-size:11px;color:var(--ink3);margin-top:.5rem;font-style:italic">💡 Le solde positif signifie que le partenaire a payé plus que sa part — les autres lui doivent. Solde négatif = il doit aux autres.</div>
+    </div>
+
+    <!-- Qui doit à qui -->
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.75rem">🤝 Pour équilibrer les comptes</div>
+      ${transfers.length===0?
+        `<div style="text-align:center;padding:1.5rem;color:var(--ink3)">✅ Tous les comptes sont équilibrés!</div>`:
+        transfers.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:.875rem;background:var(--surf2);border-radius:var(--rs);margin-bottom:.5rem;border-left:3px solid var(--pur-m)">
+          <div style="display:flex;align-items:center;gap:.75rem">
+            <span style="background:${PARTNER_COLORS[t.from]};color:#fff;padding:4px 10px;border-radius:99px;font-size:13px;font-weight:600">${t.from}</span>
+            <span style="color:var(--ink3);font-size:16px">→</span>
+            <span style="background:${PARTNER_COLORS[t.to]};color:#fff;padding:4px 10px;border-radius:99px;font-size:13px;font-weight:600">${t.to}</span>
+          </div>
+          <div style="font-size:1.1rem;font-weight:700;color:var(--ink)">${fmt(t.amount)}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════
 // CSV EXPORT
 // ══════════════════════════════════════════════════
 function exportCSV(type){
@@ -2288,7 +2465,7 @@ function toast(msg,type=''){
 // ══════════════════════════════════════════════════
 // KEYBOARD
 // ══════════════════════════════════════════════════
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();closePartsModal();}});
 
 // ══════════════════════════════════════════════════
 // GOOGLE DRIVE
