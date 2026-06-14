@@ -1487,6 +1487,153 @@ function renderRes(){
     <div class="kpi hl-b"><div class="lbl">Résultat net</div><div class="val" style="color:${c.net>=0?'var(--grn)':'var(--red)'}">${fmt(c.net)}</div><div class="sub">Rendement: ${c.totRev>0?((c.net/c.totRev)*100).toFixed(1)+'%':'—'}</div></div>`;
   buildResTable(c,$('res-table'));
   updatePart();
+  // Charts
+  buildCharts(imm);
+}
+
+// ══════════════════════════════════════════════════
+// GRAPHIQUES VISUELS (SVG natif)
+// ══════════════════════════════════════════════════
+function buildCharts(imm){
+  let container=$('res-charts');
+  if(!container){
+    container=document.createElement('div');
+    container.id='res-charts';
+    container.style.cssText='margin-top:1.5rem';
+    const panel=$('panel-res');
+    if(panel)panel.appendChild(container);
+  }
+  const deps=filterByYear(imm.depenses||[]);
+  const revs=filterByYear(imm.revenus||[]);
+  const months=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+  // Monthly data
+  const monthData=months.map((m,i)=>{
+    const mm=String(i+1).padStart(2,'0');
+    const mDep=deps.filter(d=>d.date&&d.date.slice(5,7)===mm).reduce((s,d)=>s+(d.montant||0)+(d.tax||0),0);
+    const mRev=revs.filter(r=>r.date&&r.date.slice(5,7)===mm).reduce((s,r)=>s+(r.montant||0),0);
+    return {m,mDep,mRev,net:mRev-mDep};
+  });
+  const maxVal=Math.max(...monthData.map(d=>Math.max(d.mDep,d.mRev)),100);
+
+  // Cumulative net
+  let cum=0;
+  const cumData=monthData.map(d=>{cum+=d.net;return cum;});
+  const cumMax=Math.max(...cumData.map(Math.abs),100);
+
+  // By category
+  const depByCat={};
+  deps.forEach(d=>{const k=d.cat||'Autres';depByCat[k]=(depByCat[k]||0)+(d.montant||0)+(d.tax||0);});
+  const catEntries=Object.entries(depByCat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const totDep=catEntries.reduce((s,[,v])=>s+v,0);
+
+  const CAT_COLORS=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#9090b0'];
+
+  container.innerHTML=`
+    <!-- CHART 1: Revenus vs Dépenses par mois -->
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.5rem;margin-bottom:1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--ink)">📊 Revenus vs Dépenses (${activeYear})</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:2px">Comparaison mensuelle</div>
+        </div>
+        <div style="display:flex;gap:1rem;font-size:12px">
+          <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;background:#34a367;border-radius:3px"></div>Revenus</div>
+          <div style="display:flex;align-items:center;gap:6px"><div style="width:12px;height:12px;background:#e05252;border-radius:3px"></div>Dépenses</div>
+        </div>
+      </div>
+      ${buildBarChart(monthData,maxVal)}
+    </div>
+
+    <!-- CHART 2 + 3 (side by side) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">
+      <!-- Pie chart -->
+      <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.5rem">
+        <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:1rem">🥧 Dépenses par catégorie</div>
+        ${catEntries.length===0?`<div style="text-align:center;padding:2rem;color:var(--ink3);font-size:13px">Aucune dépense</div>`:buildPieChart(catEntries,totDep,CAT_COLORS)}
+      </div>
+      <!-- Line chart -->
+      <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.5rem">
+        <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:1rem">📈 Résultat net cumulatif</div>
+        ${buildLineChart(monthData,cumData,cumMax,months)}
+      </div>
+    </div>`;
+}
+
+function buildBarChart(monthData,maxVal){
+  const W=720,H=240,padL=50,padR=10,padT=15,padB=30;
+  const innerW=W-padL-padR,innerH=H-padT-padB;
+  const barW=innerW/12/3; // 2 barres par mois + espace
+  const gap=innerW/12;
+  // Y axis ticks
+  const ticks=4;
+  let yAxis='';
+  for(let i=0;i<=ticks;i++){
+    const v=(maxVal*i/ticks);
+    const y=padT+innerH-(i/ticks)*innerH;
+    yAxis+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#e4e2da" stroke-width="1" stroke-dasharray="${i===0?'0':'2,3'}"/>
+      <text x="${padL-6}" y="${y+4}" text-anchor="end" font-size="10" fill="#9090b0">${v>=1000?(v/1000).toFixed(0)+'k':Math.round(v)}</text>`;
+  }
+  // Bars
+  let bars='';
+  monthData.forEach((d,i)=>{
+    const xCenter=padL+gap*i+gap/2;
+    const hR=(d.mRev/maxVal)*innerH;
+    const hD=(d.mDep/maxVal)*innerH;
+    const xR=xCenter-barW-1;
+    const xD=xCenter+1;
+    if(d.mRev>0)bars+=`<rect x="${xR}" y="${padT+innerH-hR}" width="${barW}" height="${hR}" fill="#34a367" rx="2"><title>${d.m} - Revenus: ${fmt(d.mRev)}</title></rect>`;
+    if(d.mDep>0)bars+=`<rect x="${xD}" y="${padT+innerH-hD}" width="${barW}" height="${hD}" fill="#e05252" rx="2"><title>${d.m} - Dépenses: ${fmt(d.mDep)}</title></rect>`;
+    bars+=`<text x="${xCenter}" y="${H-10}" text-anchor="middle" font-size="11" fill="#4a4a6a" font-weight="500">${d.m}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" preserveAspectRatio="xMidYMid meet">${yAxis}${bars}</svg>`;
+}
+
+function buildPieChart(entries,total,colors){
+  const size=200,cx=size/2,cy=size/2,r=80;
+  let svg='',legend='',angle=-Math.PI/2;
+  entries.forEach(([cat,val],i)=>{const pct=val/total;const sweep=pct*Math.PI*2;const x1=cx+r*Math.cos(angle);const y1=cy+r*Math.sin(angle);angle+=sweep;const x2=cx+r*Math.cos(angle);const y2=cy+r*Math.sin(angle);const large=sweep>Math.PI?1:0;const color=colors[i%colors.length];if(entries.length===1){svg+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>`;}else{svg+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${color}"><title>${cat}: ${fmt(val)} (${(pct*100).toFixed(1)}%)</title></path>`;}legend+=`<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0"><div style="width:10px;height:10px;background:${color};border-radius:2px;flex-shrink:0"></div><span style="flex:1;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${cat}</span><span style="color:var(--ink3);font-weight:600;font-variant-numeric:tabular-nums">${(pct*100).toFixed(1)}%</span></div>`;});
+  return `<div style="display:flex;gap:1rem;align-items:flex-start"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex-shrink:0">${svg}<circle cx="${cx}" cy="${cy}" r="32" fill="var(--surf)"/><text x="${cx}" y="${cy-3}" text-anchor="middle" font-size="9" fill="#9090b0">TOTAL</text><text x="${cx}" y="${cy+10}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">${total>=1000?(total/1000).toFixed(1)+'k':Math.round(total)}$</text></svg><div style="flex:1;max-height:200px;overflow-y:auto">${legend}</div></div>`;
+}
+
+function buildLineChart(monthData,cumData,cumMax,months){
+  const W=400,H=200,padL=45,padR=10,padT=15,padB=25;
+  const innerW=W-padL-padR,innerH=H-padT-padB;
+  const stepX=innerW/(monthData.length-1||1);
+  // Y axis : -max to +max
+  const yMid=padT+innerH/2;
+  // Ticks
+  let yAxis=`<line x1="${padL}" y1="${yMid}" x2="${W-padR}" y2="${yMid}" stroke="#1a1a2e" stroke-width="1.5"/>`;
+  const ticks=2;
+  for(let i=-ticks;i<=ticks;i++){
+    if(i===0)continue;
+    const v=cumMax*i/ticks;
+    const y=yMid-(i/ticks)*(innerH/2);
+    yAxis+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#e4e2da" stroke-width="1" stroke-dasharray="2,3"/>
+      <text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="#9090b0">${v>0?'+':''}${v>=1000||v<=-1000?(v/1000).toFixed(0)+'k':Math.round(v)}</text>`;
+  }
+  // Path
+  let path='',points='',areaPath='';
+  cumData.forEach((v,i)=>{
+    const x=padL+stepX*i;
+    const y=yMid-(v/cumMax)*(innerH/2);
+    path+=(i===0?'M':'L')+x+','+y+' ';
+    points+=`<circle cx="${x}" cy="${y}" r="3" fill="${v>=0?'#34a367':'#e05252'}" stroke="#fff" stroke-width="1.5"><title>${months[i]}: ${v>=0?'+':''}${fmt(v)}</title></circle>`;
+  });
+  // Area fill
+  areaPath=path+`L${padL+stepX*(cumData.length-1)},${yMid} L${padL},${yMid} Z`;
+  // X labels
+  let xLabels='';
+  months.forEach((m,i)=>{
+    if(i%2===0)xLabels+=`<text x="${padL+stepX*i}" y="${H-8}" text-anchor="middle" font-size="10" fill="#9090b0">${m}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" preserveAspectRatio="xMidYMid meet">
+    ${yAxis}
+    <path d="${areaPath}" fill="url(#netGrad)" opacity="0.2"/>
+    <defs><linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#34a367"/><stop offset="100%" stop-color="#34a367" stop-opacity="0"/></linearGradient></defs>
+    <path d="${path}" stroke="#1a1a2e" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    ${points}${xLabels}
+  </svg>`;
 }
 
 function updatePart(){
