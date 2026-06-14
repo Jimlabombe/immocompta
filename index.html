@@ -332,6 +332,116 @@ tbody tr:hover{background:var(--surf2)}
 .step-body code{background:var(--surf2);border:1px solid var(--bdr);border-radius:4px;padding:1px 5px;font-size:11px;font-family:monospace}
 .copy-btn{background:var(--surf2);border:1px solid var(--bdr);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-left:6px}
 .copy-btn:hover{background:var(--bdr)}
+
+/* ══════════════════════════════════════════════════
+   MODE MOBILE — s'active automatiquement sur écrans < 768px
+   ══════════════════════════════════════════════════ */
+.mobile-toggle{display:none;position:fixed;top:.5rem;left:.5rem;z-index:200;background:var(--ink);color:#fff;border:none;border-radius:8px;width:44px;height:44px;font-size:22px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.rail-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:90}
+.rail-backdrop.open{display:block}
+
+@media (max-width: 767px){
+  /* Mobile toggle button */
+  .mobile-toggle{display:flex;align-items:center;justify-content:center}
+
+  /* Shell layout */
+  .shell{flex-direction:column}
+
+  /* Rail becomes a slide-in panel */
+  .rail{position:fixed;top:0;left:-260px;height:100vh;width:240px;z-index:100;transition:left .25s;box-shadow:4px 0 16px rgba(0,0,0,.15)}
+  .rail.open{left:0}
+
+  /* Main fills entire width */
+  .main{flex:1;width:100%;display:flex;flex-direction:column;overflow-x:hidden}
+
+  /* Topbar adjustments */
+  .topbar{flex-wrap:wrap;padding:.625rem .75rem .625rem 3.5rem;gap:.5rem}
+  .topbar > div:first-child{order:1;flex:1;min-width:0}
+  .topbar-title{font-size:1rem !important}
+  .topbar-sub{font-size:11px !important;display:block;margin-left:0 !important}
+  .topbar > div:nth-child(2){order:2;margin:0 !important;justify-content:center}
+  .topbar-right{order:3;width:100%;justify-content:flex-end;flex-wrap:wrap;gap:4px}
+  .topbar-right .btn{font-size:11px;padding:5px 8px}
+
+  /* Content padding */
+  .content{padding:.75rem !important}
+
+  /* KPI row stacks */
+  .kpi-row{grid-template-columns:1fr !important;gap:.5rem !important}
+  .kpi{padding:.75rem !important}
+  .kpi .val{font-size:1.25rem !important}
+
+  /* Tables scroll horizontally */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{font-size:12px;min-width:520px}
+  th,td{padding:6px 8px !important}
+  .btn-xs{padding:3px 6px;font-size:10px}
+
+  /* Modals fullscreen on mobile */
+  .modal{width:100% !important;max-width:100% !important;max-height:100vh !important;border-radius:0 !important;margin:0}
+  .overlay{padding:0 !important;align-items:stretch}
+  .mh{padding:.875rem 1rem !important}
+  .mh h2{font-size:1rem !important}
+  .mb{padding:1rem !important}
+  .mf{padding:.75rem 1rem !important;flex-wrap:wrap;gap:.5rem !important}
+  .mf .btn{flex:1;min-width:0;font-size:13px;padding:8px 10px}
+
+  /* Form grid stacks */
+  .fgrid{grid-template-columns:1fr !important}
+  .fg.full{grid-column:1 !important}
+  .fg input,.fg select,.fg textarea{font-size:16px !important}
+
+  /* Buttons bigger for touch */
+  .btn{padding:7px 12px;font-size:13px}
+  .btn-sm{padding:6px 10px;font-size:12px}
+
+  /* Year selector */
+  #year-display{min-width:60px !important;padding:4px 10px !important}
+
+  /* Scan zone */
+  .scan-zone{padding:1.5rem 1rem !important}
+
+  /* Immeuble cards stack */
+  .imm-card{flex-direction:column}
+
+  /* Charts adjust */
+  #res-charts > div:nth-child(2){grid-template-columns:1fr !important}
+
+  /* Gallery grid */
+  .fact-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr)) !important}
+
+  /* Hide some columns to save space */
+  .hide-mobile{display:none !important}
+
+  /* Locataire cards */
+  .loc-card{padding:.875rem !important}
+  .loc-months{grid-template-columns:repeat(6,1fr) !important;gap:6px}
+  .loc-month{aspect-ratio:1.2}
+
+  /* Hypothèque cards */
+  .hyp-grid{grid-template-columns:1fr 1fr !important;gap:.5rem !important}
+  .hyp-card{padding:.875rem !important}
+  .hyp-card .val{font-size:1.1rem !important}
+  .hyp-table{font-size:11px}
+  .hyp-table th,.hyp-table td{padding:5px 8px !important}
+
+  /* Login screen */
+  #login-screen > div{margin:1rem;padding:1.5rem !important;width:auto !important;max-width:none !important}
+
+  /* Toasts */
+  .toasts{bottom:1rem !important;left:1rem !important;right:1rem !important}
+  .toast{max-width:100% !important;font-size:13px}
+
+  /* Lightbox */
+  .lb img{max-width:96vw;max-height:80vh}
+}
+
+/* Tablette */
+@media (min-width: 768px) and (max-width: 1023px){
+  .rail{width:200px}
+  .kpi-row{grid-template-columns:repeat(2,1fr) !important}
+  #res-charts > div:nth-child(2){grid-template-columns:1fr 1fr !important}
+}
 </style>
 </head>
 <body>
@@ -362,8 +472,12 @@ tbody tr:hover{background:var(--surf2)}
 
 <div class="shell" id="app-shell" style="display:none">
 
+<!-- Mobile menu toggle (visible uniquement sur mobile) -->
+<button class="mobile-toggle" id="mobile-toggle" onclick="toggleRail()">☰</button>
+<div class="rail-backdrop" id="rail-backdrop" onclick="closeRail()"></div>
+
 <!-- ══ RAIL ══ -->
-<nav class="rail">
+<nav class="rail" id="rail-nav">
   <div class="rail-logo">Immo<span>Compta</span><small>Pro — Multi-immeubles</small></div>
 
   <div class="rail-section">Vue globale</div>
@@ -3267,6 +3381,27 @@ function genResPDF(){
   win.onload=()=>setTimeout(()=>win.print(),500);
   toast('📄 État des résultats généré — Enregistrer en PDF','ok');
 }
+
+// ══════════════════════════════════════════════════
+// MOBILE — Toggle rail menu
+// ══════════════════════════════════════════════════
+function toggleRail(){
+  const rail=$('rail-nav');
+  const backdrop=$('rail-backdrop');
+  if(rail.classList.contains('open')){closeRail();}
+  else{rail.classList.add('open');backdrop.classList.add('open');}
+}
+function closeRail(){
+  $('rail-nav').classList.remove('open');
+  $('rail-backdrop').classList.remove('open');
+}
+
+// Auto-close rail on mobile when changing panel
+const _origShowPanel=showPanel;
+showPanel=function(id){
+  _origShowPanel(id);
+  if(window.innerWidth<768)closeRail();
+};
 
 // ══════════════════════════════════════════════════
 // GOOGLE AUTH
