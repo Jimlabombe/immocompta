@@ -499,6 +499,7 @@ tbody tr:hover{background:var(--surf2)}
   <button class="rail-add-imm" onclick="openAddImm()">+ Ajouter un immeuble</button>
 
   <div class="rail-spacer"></div>
+  <button class="rail-btn" onclick="openSecurityPanel()" style="margin:.5rem .75rem;background:rgba(245,158,11,.15);color:#fbbf24"><span class="ic">🔒</span> Sécurité & Sauvegarde</button>
   <div class="rail-footer">
     <div class="drive-mini" style="margin-top:.5rem">
       <strong>🔥 Firebase (temps réel)</strong>
@@ -950,6 +951,61 @@ tbody tr:hover{background:var(--surf2)}
 </div>
 </div>
 
+<!-- ══ MODAL SÉCURITÉ ══ -->
+<div class="overlay" id="ov-security" onclick="if(event.target.id==='ov-security')closeSecurityPanel()">
+<div class="modal narrow">
+  <div class="mh"><h2>🔒 Sécurité & Sauvegarde</h2><button class="xbtn" onclick="closeSecurityPanel()">×</button></div>
+  <div class="mb">
+    <!-- Statut sécurité -->
+    <div style="background:var(--grn-l);border:1px solid var(--grn-m);border-radius:var(--rs);padding:1rem;margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:600;color:var(--grn);margin-bottom:6px">✅ Sécurité active</div>
+      <div style="font-size:12px;color:var(--ink2);line-height:1.6">
+        • Connexion Google obligatoire<br>
+        • 3 emails autorisés uniquement<br>
+        • HTTPS chiffré<br>
+        • Déconnexion auto après 30 min d'inactivité<br>
+        • Journal d'activité actif
+      </div>
+    </div>
+
+    <!-- Journal d'activité -->
+    <div style="margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">📋 Journal d'activité</div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Voir qui a fait quoi et quand</div>
+      <button class="btn btn-out" style="width:100%" onclick="showActivityLog()">Voir le journal complet</button>
+    </div>
+
+    <!-- Sauvegardes cloud -->
+    <div style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:700">☁ Sauvegardes (Firebase Cloud)</div>
+        <button class="btn btn-ink btn-xs" onclick="createCloudBackup(false)">+ Nouvelle</button>
+      </div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">Sauvegardes accessibles aux 3 partenaires depuis n'importe quel appareil. Les 12 dernières semaines sont conservées.</div>
+      <div id="backups-list" style="max-height:280px;overflow-y:auto;border:1px solid var(--bdr);border-radius:var(--rs);background:var(--surf)"></div>
+    </div>
+
+    <!-- Sauvegarde auto -->
+    <div style="background:var(--blu-l);border:1px solid var(--blu-m);border-radius:var(--rs);padding:.875rem">
+      <div style="font-size:12px;font-weight:600;color:var(--blu);margin-bottom:4px">🔄 Sauvegarde automatique hebdomadaire</div>
+      <div style="font-size:11px;color:var(--ink2);line-height:1.5">Une sauvegarde se crée automatiquement chaque semaine dans le cloud Firebase. Restaurez n'importe laquelle en un clic depuis la liste ci-dessus.</div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-out" onclick="closeSecurityPanel()">Fermer</button></div>
+</div>
+</div>
+
+<!-- ══ MODAL JOURNAL D'ACTIVITÉ ══ -->
+<div class="overlay" id="ov-actlog" onclick="if(event.target.id==='ov-actlog')closeActivityLog()">
+<div class="modal">
+  <div class="mh"><h2>📋 Journal d'activité</h2><button class="xbtn" onclick="closeActivityLog()">×</button></div>
+  <div class="mb">
+    <div id="act-log-content"></div>
+  </div>
+  <div class="mf"><button class="btn btn-out" onclick="closeActivityLog()">Fermer</button></div>
+</div>
+</div>
+
 <!-- LIGHTBOX -->
 <div class="lb" id="lb" onclick="closeLB()"><button class="lb-close" onclick="closeLB()">×</button><img id="lb-img"><div class="lb-cap" id="lb-cap"></div></div>
 <div class="toasts" id="toasts"></div>
@@ -1041,6 +1097,15 @@ onAuthStateChanged(auth, (user) => {
     if(typeof renderRail === 'function') { renderRail(); }
     if(typeof showPanel === 'function') { showPanel('global'); }
     if(typeof fbLoad === 'function') { setTimeout(fbLoad, 500); }
+
+    // Security: start inactivity timer
+    if(typeof resetInactivityTimer === 'function') resetInactivityTimer();
+    // Load activity log from Firebase
+    if(typeof loadActivityLogFromFirebase === 'function') setTimeout(loadActivityLogFromFirebase, 1000);
+    // Check weekly backup
+    if(typeof checkWeeklyBackup === 'function') setTimeout(checkWeeklyBackup, 3000);
+    // Log connection
+    if(typeof logActivity === 'function') setTimeout(()=>logActivity('Connexion', user.email),1500);
 
     // Start real-time listener
     const dataRef = doc(db, 'immocompta', 'shared');
@@ -1287,6 +1352,298 @@ function getDepenses(immId){ return (getImm(immId)||{}).depenses||[]; }
 function getRevenus(immId){ return (getImm(immId)||{}).revenus||[]; }
 
 // ══════════════════════════════════════════════════
+// SÉCURITÉ — Déconnexion auto après inactivité (30 min)
+// ══════════════════════════════════════════════════
+const INACTIVITY_MS = 30 * 60 * 1000; // 30 minutes
+let _inactivityTimer = null;
+let _warnTimer = null;
+
+function resetInactivityTimer(){
+  clearTimeout(_inactivityTimer);
+  clearTimeout(_warnTimer);
+  // Warn 1 min before
+  _warnTimer = setTimeout(()=>{
+    toast('⚠ Vous serez déconnecté dans 1 minute pour inactivité', 'err');
+  }, INACTIVITY_MS - 60000);
+  // Logout
+  _inactivityTimer = setTimeout(()=>{
+    toast('🔒 Déconnexion automatique pour inactivité', 'err');
+    setTimeout(()=>{
+      if(window._fbSignOut) window._fbSignOut();
+    }, 2000);
+  }, INACTIVITY_MS);
+}
+
+// Reset on any activity
+['mousedown','keydown','touchstart','scroll'].forEach(evt=>{
+  document.addEventListener(evt, resetInactivityTimer, {passive:true});
+});
+
+// ══════════════════════════════════════════════════
+// SÉCURITÉ — Journal d'activité
+// ══════════════════════════════════════════════════
+function logActivity(action, details){
+  try{
+    const log = JSON.parse(localStorage.getItem('ic_activity_log') || '[]');
+    const user = window._fbCurrentUser?.email || 'inconnu';
+    log.unshift({
+      ts: new Date().toISOString(),
+      user: user.split('@')[0],
+      action,
+      details: details || ''
+    });
+    // Keep only last 200 entries
+    if(log.length > 200) log.length = 200;
+    localStorage.setItem('ic_activity_log', JSON.stringify(log));
+
+    // Also save to Firebase
+    if(window._fbReady){
+      window._fbSetDoc(
+        window._fbDoc(window._fbDb, 'immocompta', 'activity_log'),
+        { entries: log.slice(0,200), _updated: new Date().toISOString() }
+      ).catch(e=>console.warn('Activity log save failed:',e));
+    }
+  } catch(e){ console.warn('Log error:', e); }
+}
+
+function getActivityLog(){
+  try{
+    return JSON.parse(localStorage.getItem('ic_activity_log') || '[]');
+  } catch(e){ return []; }
+}
+
+async function loadActivityLogFromFirebase(){
+  if(!window._fbReady) return;
+  try{
+    const snap = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta', 'activity_log'));
+    if(snap.exists()){
+      const data = snap.data();
+      if(data.entries) localStorage.setItem('ic_activity_log', JSON.stringify(data.entries));
+    }
+  } catch(e){ console.warn('Activity log load failed:', e); }
+}
+
+function showActivityLog(){
+  const log = getActivityLog();
+  const html = `<div style="max-height:60vh;overflow-y:auto">
+    ${log.length===0 ? '<div style="text-align:center;padding:2rem;color:var(--ink3)">Aucune activité enregistrée</div>' :
+    `<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:var(--surf2);position:sticky;top:0">
+        <th style="text-align:left;padding:8px;font-size:10px;text-transform:uppercase">Date/Heure</th>
+        <th style="text-align:left;padding:8px;font-size:10px;text-transform:uppercase">Utilisateur</th>
+        <th style="text-align:left;padding:8px;font-size:10px;text-transform:uppercase">Action</th>
+        <th style="text-align:left;padding:8px;font-size:10px;text-transform:uppercase">Détails</th>
+      </tr></thead>
+      <tbody>
+      ${log.map(e=>{
+        const d = new Date(e.ts);
+        const dStr = d.toLocaleDateString('fr-CA')+' '+d.toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'});
+        return `<tr style="border-bottom:1px solid var(--bdr)">
+          <td style="padding:6px 8px;white-space:nowrap;color:var(--ink3);font-size:11px">${dStr}</td>
+          <td style="padding:6px 8px;font-weight:600">${e.user}</td>
+          <td style="padding:6px 8px">${e.action}</td>
+          <td style="padding:6px 8px;color:var(--ink2);font-size:11px">${e.details||''}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`}
+  </div>`;
+
+  $('act-log-content').innerHTML = html;
+  $('ov-actlog').classList.add('open');
+}
+
+function closeActivityLog(){ $('ov-actlog').classList.remove('open'); }
+
+// ══════════════════════════════════════════════════
+// SÉCURITÉ — Sauvegardes hebdomadaires dans Firebase
+// ══════════════════════════════════════════════════
+const MAX_BACKUPS = 12; // Garder 12 semaines (3 mois)
+
+function getWeekKey(){
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const days = Math.floor((now - start) / 86400000);
+  const week = Math.ceil((days + start.getDay() + 1) / 7);
+  return now.getFullYear() + '-W' + String(week).padStart(2, '0');
+}
+
+async function checkWeeklyBackup(){
+  if(!window._fbReady) return;
+  try{
+    const snap = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta', 'backups_index'));
+    const idx = snap.exists() ? (snap.data().weeks || []) : [];
+    const currentWeek = getWeekKey();
+    if(!idx.includes(currentWeek) && immeubles.length > 0){
+      // Trigger automatic backup
+      setTimeout(()=>createCloudBackup(true), 5000);
+    }
+  } catch(e){ console.warn('Backup check failed:', e); }
+}
+
+async function createCloudBackup(isAuto){
+  if(!window._fbReady){ toast('Firebase non connecté','err'); return; }
+  try{
+    const weekKey = getWeekKey();
+    const payload = {
+      version: '1.0',
+      created: new Date().toISOString(),
+      week: weekKey,
+      user: window._fbCurrentUser?.email || 'inconnu',
+      immeubles: immeubles,
+      auto: !!isAuto
+    };
+    // Strip base64 images (photos already in Storage)
+    const cleaned = JSON.parse(JSON.stringify(payload));
+    cleaned.immeubles.forEach(imm=>{
+      (imm.depenses||[]).forEach(d=>{
+        if(d.receipt && d.receipt.startsWith('data:image')) d.receipt = '[image dans Storage]';
+      });
+      (imm.revenus||[]).forEach(r=>{
+        if(r.receipt && r.receipt.startsWith('data:image')) r.receipt = '[image dans Storage]';
+      });
+    });
+
+    await window._fbSetDoc(
+      window._fbDoc(window._fbDb, 'immocompta_backups', weekKey),
+      cleaned
+    );
+
+    // Update index
+    const idxSnap = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta', 'backups_index'));
+    let weeks = idxSnap.exists() ? (idxSnap.data().weeks || []) : [];
+    if(!weeks.includes(weekKey)) weeks.unshift(weekKey);
+    // Keep only last MAX_BACKUPS weeks
+    if(weeks.length > MAX_BACKUPS){
+      const toDelete = weeks.slice(MAX_BACKUPS);
+      weeks = weeks.slice(0, MAX_BACKUPS);
+      for(const w of toDelete){
+        try{
+          await window._fbSetDoc(window._fbDoc(window._fbDb, 'immocompta_backups', w), {deleted:true,_when:new Date().toISOString()});
+        } catch(e){}
+      }
+    }
+    await window._fbSetDoc(
+      window._fbDoc(window._fbDb, 'immocompta', 'backups_index'),
+      { weeks, _updated: new Date().toISOString() }
+    );
+
+    toast(isAuto ? '☁ Sauvegarde hebdomadaire créée' : '☁ Sauvegarde créée', 'ok');
+    logActivity('Sauvegarde créée', isAuto ? `Auto (${weekKey})` : `Manuelle (${weekKey})`);
+    if($('ov-security')?.classList.contains('open')) loadBackupsList();
+  } catch(err){
+    console.error('Backup error:', err);
+    toast('Erreur de sauvegarde : '+err.message, 'err');
+  }
+}
+
+async function loadBackupsList(){
+  if(!window._fbReady) return;
+  const container = $('backups-list');
+  if(!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--ink3);font-size:12px">Chargement...</div>';
+  try{
+    const idxSnap = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta', 'backups_index'));
+    const weeks = idxSnap.exists() ? (idxSnap.data().weeks || []) : [];
+    if(weeks.length === 0){
+      container.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--ink3);font-size:12px">Aucune sauvegarde — créez-en une avec le bouton ci-dessus</div>';
+      return;
+    }
+    const items = [];
+    for(const w of weeks){
+      try{
+        const s = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta_backups', w));
+        if(s.exists()){
+          const d = s.data();
+          if(!d.deleted) items.push({week:w, ...d});
+        }
+      } catch(e){}
+    }
+    container.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:var(--surf2)">
+        <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase">Date</th>
+        <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase">Auteur</th>
+        <th style="text-align:center;padding:6px 8px;font-size:10px;text-transform:uppercase">Type</th>
+        <th style="padding:6px 8px"></th>
+      </tr></thead>
+      <tbody>
+      ${items.map(b=>{
+        const d = new Date(b.created);
+        const dStr = d.toLocaleDateString('fr-CA');
+        const tStr = d.toLocaleTimeString('fr-CA',{hour:'2-digit',minute:'2-digit'});
+        const user = (b.user||'').split('@')[0];
+        return `<tr style="border-bottom:1px solid var(--bdr)">
+          <td style="padding:6px 8px">
+            <div style="font-weight:600">${dStr}</div>
+            <div style="font-size:10px;color:var(--ink3)">${tStr} · ${b.week}</div>
+          </td>
+          <td style="padding:6px 8px;color:var(--ink2)">${user}</td>
+          <td style="padding:6px 8px;text-align:center">
+            ${b.auto?'<span style="background:var(--blu-l);color:var(--blu);padding:2px 6px;border-radius:99px;font-size:10px;font-weight:600">Auto</span>':'<span style="background:var(--pur-l);color:var(--pur);padding:2px 6px;border-radius:99px;font-size:10px;font-weight:600">Manuel</span>'}
+          </td>
+          <td style="padding:4px 8px;white-space:nowrap;text-align:right">
+            <button class="btn btn-out btn-xs" onclick="downloadCloudBackup('${b.week}')" title="Télécharger">⬇</button>
+            <button class="btn btn-xs" style="background:var(--grn-l);color:var(--grn);border:1px solid var(--grn-m)" onclick="restoreCloudBackup('${b.week}')" title="Restaurer">↺</button>
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+  } catch(err){
+    container.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--red);font-size:12px">Erreur de chargement</div>';
+  }
+}
+
+async function downloadCloudBackup(week){
+  try{
+    const s = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta_backups', week));
+    if(!s.exists()){ toast('Sauvegarde introuvable','err'); return; }
+    const data = s.data();
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `immocompta_backup_${week}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('✓ Sauvegarde téléchargée','ok');
+  } catch(err){
+    toast('Erreur : '+err.message,'err');
+  }
+}
+
+async function restoreCloudBackup(week){
+  if(!confirm(`⚠ ATTENTION : Restaurer la sauvegarde "${week}" va REMPLACER toutes vos données actuelles.\n\nCette action est irréversible. Continuer?`)) return;
+  try{
+    const s = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta_backups', week));
+    if(!s.exists()){ toast('Sauvegarde introuvable','err'); return; }
+    const data = s.data();
+    if(!data.immeubles){ toast('Sauvegarde invalide','err'); return; }
+    immeubles = data.immeubles;
+    activeImmId = immeubles[0]?.id || null;
+    save();
+    renderRail();
+    showPanel('global');
+    closeSecurityPanel();
+    toast('✓ Sauvegarde restaurée','ok');
+    logActivity('Sauvegarde restaurée', `Semaine ${week} - ${data.immeubles.length} immeubles`);
+  } catch(err){
+    toast('Erreur : '+err.message,'err');
+  }
+}
+
+function openSecurityPanel(){
+  $('ov-security').classList.add('open');
+  setTimeout(loadBackupsList, 200);
+}
+function closeSecurityPanel(){
+  $('ov-security').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════
 // INIT — create demo immeuble if empty
 // ══════════════════════════════════════════════════
 if(!immeubles.length){
@@ -1373,6 +1730,7 @@ function saveImm(){
   renderRail();closeAddImm();
   showPanel('dep');
   toast('Immeuble créé','ok');
+  logActivity('Immeuble créé', name);
   $('imm-name').value='';$('imm-addr').value='';
 }
 
@@ -1423,6 +1781,7 @@ function deleteImm(id){
   save();renderRail();closeAddImm();
   showPanel('global');
   toast('Immeuble supprimé');
+  logActivity('Immeuble supprimé', imm?.name||'');
 }
 
 // ══════════════════════════════════════════════════
@@ -1921,11 +2280,13 @@ function saveMan(){
 function delEntry(id,type){
   if(!confirm('Supprimer cette entrée?'))return;
   const imm=activeImm();
+  const entry = type==='dep' ? imm.depenses.find(d=>d.id===id) : imm.revenus.find(r=>r.id===id);
   if(type==='dep')imm.depenses=imm.depenses.filter(d=>d.id!==id);
   else imm.revenus=imm.revenus.filter(r=>r.id!==id);
   save();
   if(type==='dep')renderDep();else renderRev();
   toast('Supprimé');
+  logActivity(type==='dep'?'Dépense supprimée':'Revenu supprimé', `${imm.name}: ${entry?.desc||''} - ${fmt((entry?.montant||0)+(entry?.tax||0))}`);
 }
 
 // ══════════════════════════════════════════════════
@@ -2933,7 +3294,7 @@ function toast(msg,type=''){
 // ══════════════════════════════════════════════════
 // KEYBOARD
 // ══════════════════════════════════════════════════
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();closePartsModal();closeRembModal();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();closePartsModal();closeRembModal();closeSecurityPanel();closeActivityLog();}});
 
 // ══════════════════════════════════════════════════
 // GOOGLE DRIVE
