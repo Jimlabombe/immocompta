@@ -2507,12 +2507,13 @@ function renderRemb(){
     }
   });
 
-  const totalShared=paid.Jim+paid.Antoine+paid['Jean-Christophe']+paid.Commun;
-  // Theoretical share per partner — applied on TOTAL (incl. compte commun)
+  // ── 3) Calculate share based ONLY on personal payments (exclude Compte commun) ──
+  const totalPersonnel=paid.Jim+paid.Antoine+paid['Jean-Christophe'];
+  const totalShared=totalPersonnel+paid.Commun; // for display only
   const share={
-    Jim:totalShared*(parts.Jim||0)/100,
-    Antoine:totalShared*(parts.Antoine||0)/100,
-    'Jean-Christophe':totalShared*(parts['Jean-Christophe']||0)/100
+    Jim:totalPersonnel*(parts.Jim||0)/100,
+    Antoine:totalPersonnel*(parts.Antoine||0)/100,
+    'Jean-Christophe':totalPersonnel*(parts['Jean-Christophe']||0)/100
   };
   // Balance: positive = others owe them
   const balance={
@@ -2557,7 +2558,7 @@ function renderRemb(){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <div>
           <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;font-weight:600">Parts de propriété — ${imm.name}</div>
-          <div style="font-size:13px;color:var(--ink2);margin-top:2px">Total dépenses ${activeYear} : <strong>${fmt(totalShared)}</strong> <span style="color:var(--ink3);font-size:11px">(${nbAuto} dépenses comptables avec payeur · ${nbAutoCommun} compte commun · ${rembs.filter(r=>r.type==='depense').length} ajouts manuels)</span></div>
+          <div style="font-size:13px;color:var(--ink2);margin-top:2px">Total dépenses ${activeYear} : <strong>${fmt(totalShared)}</strong> <span style="color:var(--ink3);font-size:11px">(dont ${fmt(totalPersonnel)} payé personnellement · ${fmt(paid.Commun)} compte commun)</span></div>
         </div>
         <button class="btn btn-out btn-sm" onclick="openPartsModal()">⚙ Modifier</button>
       </div>
@@ -2582,10 +2583,10 @@ function renderRemb(){
             const balLabel=bal>0.01?'+ '+fmt(bal):bal<-0.01?'- '+fmt(-bal):fmt(0);
             return `<tr style="border-bottom:1px solid var(--bdr)"><td style="padding:10px 12px"><span style="display:inline-block;width:10px;height:10px;border-radius:99px;background:${PARTNER_COLORS[p]};margin-right:8px"></span>${p}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums">${fmt(paid[p])}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink3)">${fmt(share[p])}</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:${balColor};font-weight:700">${balLabel}</td></tr>`;
           }).join('')}
-          ${paid.Commun>0?`<tr style="border-bottom:1px solid var(--bdr);background:var(--surf2)"><td style="padding:10px 12px;color:var(--ink3);font-style:italic">⚪ Compte commun</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink3)">${fmt(paid.Commun)}</td><td colspan="2" style="padding:10px 12px;text-align:right;font-size:11px;color:var(--ink3)">Réparti selon les %</td></tr>`:''}
+          ${paid.Commun>0?`<tr style="border-bottom:1px solid var(--bdr);background:var(--surf2)"><td style="padding:10px 12px;color:var(--ink3);font-style:italic">⚪ Compte commun</td><td style="padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink3)">${fmt(paid.Commun)}</td><td colspan="2" style="padding:10px 12px;text-align:right;font-size:11px;color:var(--ink3)">Exclu du calcul de remboursement</td></tr>`:''}
         </tbody>
       </table>
-      <div style="font-size:11px;color:var(--ink3);margin-top:.5rem;font-style:italic">💡 Inclut automatiquement les dépenses comptables avec "Payé par" + les dépenses manuelles. Les transferts directs ajustent les soldes.</div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:.5rem;font-style:italic">💡 Le calcul exclut les dépenses du compte commun. Seuls les paiements personnels sont répartis selon les % de propriété.</div>
     </div>
 
     <!-- Qui doit à qui -->
