@@ -641,7 +641,21 @@ tbody tr:hover{background:var(--surf2)}
 
     <!-- GLOBAL -->
     <div class="panel active" id="panel-global">
+      <!-- 🔍 Recherche globale -->
+      <div style="background:linear-gradient(135deg,var(--pur-l),var(--blu-l));border:1px solid var(--bdr);border-radius:var(--r);padding:1rem;margin-bottom:1.25rem">
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <span style="font-size:1.3rem">🔍</span>
+          <input type="text" id="global-search" placeholder="Recherche globale dans tous les immeubles : fournisseur, description, montant, catégorie, notes..." oninput="renderGlobalSearch()" style="flex:1;border:1px solid var(--bdr2);border-radius:var(--rs);padding:8px 12px;font-size:14px;background:var(--surf)">
+          <button class="btn btn-out btn-sm" onclick="$('global-search').value='';renderGlobalSearch()">Effacer</button>
+        </div>
+        <div id="global-search-results" style="margin-top:.75rem;display:none"></div>
+      </div>
+
       <div class="kpi-row" id="global-kpis"></div>
+
+      <!-- 💰 Récap remboursements global -->
+      <div id="global-remb-summary"></div>
+
       <div class="res-section">
         <div class="res-section-title">État des résultats — Tous les immeubles</div>
         <div class="card"><div class="table-wrap"><table class="res-table" id="global-res-table"></table></div></div>
@@ -652,10 +666,20 @@ tbody tr:hover{background:var(--surf2)}
 
     <!-- FACTURES GALERIE -->
     <div class="panel" id="panel-factures">
-      <div class="filters" style="margin-bottom:1.25rem">
-        <div class="search-wrap"><input type="text" placeholder="Rechercher dans toutes les factures..." id="gal-search" oninput="renderGallery()"></div>
-        <select id="gal-type" onchange="renderGallery()"><option value="">Dépenses et revenus</option><option>Dépense</option><option>Revenu</option></select>
+      <div class="filters" style="margin-bottom:1rem;display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:.5rem">
+        <div class="search-wrap"><input type="text" placeholder="🔍 Recherche : description, fournisseur, catégorie, montant, notes..." id="gal-search" oninput="renderGallery()"></div>
+        <select id="gal-type" onchange="renderGallery()"><option value="">Tous types</option><option>Dépense</option><option>Revenu</option></select>
+        <select id="gal-imm" onchange="renderGallery()"><option value="">Tous les immeubles</option></select>
+        <select id="gal-month" onchange="renderGallery()">
+          <option value="">Tous les mois</option>
+          <option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option>
+          <option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option>
+          <option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option>
+          <option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option>
+        </select>
+        <select id="gal-recpt" onchange="renderGallery()"><option value="">Avec ou sans facture</option><option value="with">Avec facture</option><option value="without">Sans facture</option></select>
       </div>
+      <div id="gal-stats" style="font-size:12px;color:var(--ink3);margin-bottom:1rem"></div>
       <div id="gallery"></div>
     </div>
 
@@ -2243,29 +2267,151 @@ function updatePart(){
 function renderGlobal(){
   let totR=0,totD=0,totN=0;
   const allDepByCat={},allRevByCat={};
+  const paidByPartner={Jim:0,Antoine:0,'Jean-Christophe':0,Commun:0};
   immeubles.forEach(imm=>{
     const c=calcImm(imm);totR+=c.totRev;totD+=c.totDep;totN+=c.net;
     DEP_CATS.forEach(cat=>{allDepByCat[cat]=(allDepByCat[cat]||0)+(c.depByCat[cat]||0);});
     REV_CATS.forEach(cat=>{allRevByCat[cat]=(allRevByCat[cat]||0)+(c.revByCat[cat]||0);});
+    // Sum payments by partner across all buildings
+    filterByYear(imm.depenses||[]).forEach(d=>{
+      const t=(d.montant||0)+(d.tax||0);
+      const who=d.payepar||'Commun';
+      paidByPartner[who]=(paidByPartner[who]||0)+t;
+    });
   });
+
+  // KPIs enrichis : 4 KPIs au lieu de 3
+  const cashflowMensuel = totN/12;
+  const PARTNER_COLORS={Jim:'#3b82f6',Antoine:'#10b981','Jean-Christophe':'#f59e0b',Commun:'#9090b0'};
   $('global-kpis').innerHTML=`
     <div class="kpi hl-g"><div class="lbl">Revenus totaux</div><div class="val" style="color:var(--grn)">${fmt(totR)}</div><div class="sub">${immeubles.length} immeuble${immeubles.length!==1?'s':''}</div></div>
     <div class="kpi hl-r"><div class="lbl">Dépenses totales</div><div class="val" style="color:var(--red)">${fmt(totD)}</div></div>
-    <div class="kpi hl-b"><div class="lbl">Résultat net global</div><div class="val" style="color:${totN>=0?'var(--grn)':'var(--red)'}">${fmt(totN)}</div><div class="sub">Rendement: ${totR>0?((totN/totR)*100).toFixed(1)+'%':'—'}</div></div>`;
+    <div class="kpi hl-b"><div class="lbl">Résultat net ${activeYear}</div><div class="val" style="color:${totN>=0?'var(--grn)':'var(--red)'}">${fmt(totN)}</div><div class="sub">Rendement: ${totR>0?((totN/totR)*100).toFixed(1)+'%':'—'}</div></div>
+    <div class="kpi"><div class="lbl">Cash-flow mensuel moyen</div><div class="val" style="color:${cashflowMensuel>=0?'var(--grn)':'var(--red)'}">${fmt(cashflowMensuel)}</div><div class="sub">par mois (sur 12)</div></div>`;
+
+  // Récap remboursements global — qui a payé combien sur tous les immeubles
+  const totalPayments=paidByPartner.Jim+paidByPartner.Antoine+paidByPartner['Jean-Christophe']+paidByPartner.Commun;
+  if(totalPayments>0){
+    $('global-remb-summary').innerHTML=`
+      <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+          <div>
+            <div style="font-size:14px;font-weight:700">💰 Paiements par partenaire — ${activeYear}</div>
+            <div style="font-size:11px;color:var(--ink3);margin-top:2px">Total des dépenses payées sur tous les immeubles</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem">
+          ${['Jim','Antoine','Jean-Christophe','Commun'].map(p=>{
+            const v=paidByPartner[p]||0;
+            const pct=totalPayments>0?(v/totalPayments)*100:0;
+            return `<div style="background:var(--surf2);border-radius:var(--rs);padding:.75rem;border-left:3px solid ${PARTNER_COLORS[p]}">
+              <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;font-weight:600">${p==='Commun'?'Compte commun':p}</div>
+              <div style="font-size:1.2rem;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums">${fmt(v)}</div>
+              <div style="font-size:10px;color:var(--ink3);margin-top:2px">${pct.toFixed(1)}% du total</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  } else {
+    $('global-remb-summary').innerHTML='';
+  }
+
   buildResTable({totRev:totR,totDep:totD,net:totN,depByCat:allDepByCat,revByCat:allRevByCat},$('global-res-table'));
 
-  // Per-immeuble cards
+  // Per-immeuble cards enrichies (avec rentabilité)
   $('imm-cards').innerHTML=immeubles.map((imm,i)=>{
     const c=calcImm(imm);
+    const rentab=c.totRev>0?((c.net/c.totRev)*100):0;
+    const rentabColor=rentab>=20?'var(--grn)':rentab>=0?'#f59e0b':'var(--red)';
+    // Équité si hypothèque configurée
+    const hyp=imm.hypotheque;
+    let equityInfo='';
+    if(hyp&&hyp.soldeInitial&&hyp.valeurMarchande){
+      const soldeActuel=calcSoldeActuel(hyp);
+      const equity=hyp.valeurMarchande-soldeActuel;
+      equityInfo=`<div class="imm-stat"><div class="lbl">Équité</div><div class="vl" style="color:var(--blu-m)">${fmt(equity)}</div></div>`;
+    }
     return `<div class="imm-card" onclick="setActive('${imm.id}');showPanel('res')">
       <div class="imm-card-head"><div class="imm-dot-lg" style="background:${IMM_COLORS[i%8]}"></div><div><div class="imm-card-name">${imm.name}</div><div class="imm-card-addr">${imm.addr||'Sans adresse'} · ${imm.year}</div></div></div>
       <div class="imm-card-body">
         <div class="imm-stat"><div class="lbl">Revenus</div><div class="vl" style="color:var(--grn)">${fmt(c.totRev)}</div></div>
         <div class="imm-stat"><div class="lbl">Dépenses</div><div class="vl" style="color:var(--red)">${fmt(c.totDep)}</div></div>
         <div class="imm-stat"><div class="lbl">Net</div><div class="vl" style="color:${c.net>=0?'var(--grn)':'var(--red)'}">${fmt(c.net)}</div></div>
+        <div class="imm-stat"><div class="lbl">Rendement</div><div class="vl" style="color:${rentabColor}">${rentab.toFixed(1)}%</div></div>
+        ${equityInfo}
       </div>
     </div>`;
   }).join('');
+}
+
+// ══════════════════════════════════════════════════
+// RECHERCHE GLOBALE
+// ══════════════════════════════════════════════════
+function renderGlobalSearch(){
+  const q=($('global-search').value||'').toLowerCase().trim();
+  const box=$('global-search-results');
+  if(!q){box.style.display='none';box.innerHTML='';return;}
+  box.style.display='block';
+
+  const results=[];
+  immeubles.forEach((imm,immIdx)=>{
+    filterByYear(imm.depenses||[]).forEach(d=>{
+      const haystack=`${d.desc||''} ${d.fournisseur||''} ${d.cat||''} ${d.notes||''} ${d.montant||''} ${d.payepar||''}`.toLowerCase();
+      if(haystack.includes(q))results.push({type:'dep',imm,immIdx,item:d});
+    });
+    filterByYear(imm.revenus||[]).forEach(r=>{
+      const haystack=`${r.desc||''} ${r.source||''} ${r.cat||''} ${r.notes||''} ${r.montant||''} ${r.unite||''}`.toLowerCase();
+      if(haystack.includes(q))results.push({type:'rev',imm,immIdx,item:r});
+    });
+  });
+  results.sort((a,b)=>(b.item.date||'').localeCompare(a.item.date||''));
+
+  if(results.length===0){
+    box.innerHTML=`<div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rs);padding:1rem;text-align:center;color:var(--ink3);font-size:13px">Aucun résultat pour « ${q} » en ${activeYear}</div>`;
+    return;
+  }
+
+  // Group by immeuble
+  const grouped={};
+  results.forEach(r=>{
+    const key=r.imm.id;
+    if(!grouped[key])grouped[key]={imm:r.imm,immIdx:r.immIdx,items:[]};
+    grouped[key].items.push(r);
+  });
+
+  const totalMontant=results.reduce((s,r)=>{
+    const m=(r.item.montant||0)+(r.type==='dep'?(r.item.tax||0):0);
+    return s+m;
+  },0);
+
+  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:.5rem"><strong>${results.length}</strong> résultat${results.length>1?'s':''} pour « ${q} » · Total : <strong>${fmt(totalMontant)}</strong></div>`;
+  Object.values(grouped).forEach(({imm,immIdx,items})=>{
+    html+=`<div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rs);margin-bottom:.5rem;overflow:hidden">
+      <div style="background:var(--surf2);padding:6px 12px;display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600">
+          <div style="width:10px;height:10px;border-radius:99px;background:${IMM_COLORS[immIdx%8]}"></div>
+          ${imm.name}
+        </div>
+        <button class="btn btn-out btn-xs" onclick="setActive('${imm.id}');showPanel('global');$('global-search').value=''">Ouvrir →</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <tbody>
+        ${items.map(({type,item})=>{
+          const isDep=type==='dep';
+          const total=isDep?(item.montant||0)+(item.tax||0):(item.montant||0);
+          const badge=isDep?'<span style="background:var(--red-l);color:var(--red);padding:1px 6px;border-radius:99px;font-size:10px;font-weight:600">Dépense</span>':'<span style="background:var(--grn-l);color:var(--grn);padding:1px 6px;border-radius:99px;font-size:10px;font-weight:600">Revenu</span>';
+          return `<tr style="border-top:1px solid var(--bdr);cursor:pointer" onclick="setActive('${imm.id}');showPanel('${isDep?'dep':'rev'}')">
+            <td style="padding:6px 12px;width:80px;color:var(--ink3);font-size:11px;white-space:nowrap">${item.date||''}</td>
+            <td style="padding:6px 12px;width:75px">${badge}</td>
+            <td style="padding:6px 12px"><strong>${item.desc||''}</strong>${(item.fournisseur||item.source)?`<div style="font-size:11px;color:var(--ink3)">${item.fournisseur||item.source}</div>`:''}</td>
+            <td style="padding:6px 12px;text-align:right;font-weight:600;color:${isDep?'var(--red)':'var(--grn)'};font-variant-numeric:tabular-nums">${isDep?'-':''}${fmt(total)}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  });
+  box.innerHTML=html;
 }
 
 // ══════════════════════════════════════════════════
