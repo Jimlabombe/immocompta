@@ -332,6 +332,7 @@ tbody tr:hover{background:var(--surf2)}
 .step-body code{background:var(--surf2);border:1px solid var(--bdr);border-radius:4px;padding:1px 5px;font-size:11px;font-family:monospace}
 .copy-btn{background:var(--surf2);border:1px solid var(--bdr);border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-left:6px}
 .copy-btn:hover{background:var(--bdr)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
 /* ══════════════════════════════════════════════════
    MODE MOBILE — s'active automatiquement sur écrans < 768px
@@ -499,7 +500,11 @@ tbody tr:hover{background:var(--surf2)}
   <button class="rail-add-imm" onclick="openAddImm()">+ Ajouter un immeuble</button>
 
   <div class="rail-spacer"></div>
-  <button class="rail-btn" onclick="openSecurityPanel()" style="margin:.5rem .75rem;background:rgba(245,158,11,.15);color:#fbbf24"><span class="ic">🔒</span> Sécurité & Sauvegarde</button>
+  <div id="presence-indicator" style="margin:.25rem .75rem;padding:5px 8px;font-size:10px;color:rgba(255,255,255,.55);background:rgba(255,255,255,.05);border-radius:6px;display:none;align-items:center;gap:6px">
+    <div style="width:6px;height:6px;background:#34a367;border-radius:99px;animation:pulse 2s infinite"></div>
+    <span id="presence-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+  </div>
+  <button class="rail-btn" onclick="openSecurityPanel()" style="margin:.25rem .75rem;background:rgba(245,158,11,.12);color:#fbbf24;font-size:11px;padding:5px 8px"><span class="ic" style="font-size:13px">🔒</span> Sécurité & Sauvegarde</button>
   <div class="rail-footer">
     <div class="drive-mini" style="margin-top:.5rem">
       <strong>🔥 Firebase (temps réel)</strong>
@@ -1104,6 +1109,8 @@ onAuthStateChanged(auth, (user) => {
     if(typeof loadActivityLogFromFirebase === 'function') setTimeout(loadActivityLogFromFirebase, 1000);
     // Check weekly backup
     if(typeof checkWeeklyBackup === 'function') setTimeout(checkWeeklyBackup, 3000);
+    // Start presence indicator
+    if(typeof startPresence === 'function') setTimeout(startPresence, 2000);
     // Log connection
     if(typeof logActivity === 'function') setTimeout(()=>logActivity('Connexion', user.email),1500);
 
@@ -1641,6 +1648,115 @@ function openSecurityPanel(){
 }
 function closeSecurityPanel(){
   $('ov-security').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════
+// PRÉSENCE — détecter qui est connecté en même temps
+// ══════════════════════════════════════════════════
+let _presenceHeartbeat = null;
+let _presenceWatcher = null;
+
+function startPresence(){
+  if(!window._fbReady || !window._fbCurrentUser) return;
+  const myEmail = window._fbCurrentUser.email;
+  const myName = myEmail.split('@')[0].split('.')[0]; // ex: jim from jim.labombe@...
+  // Use first name with capital
+  const displayName = {
+    'jimlabombe':'Jim',
+    'jccaronrs18':'Jean-Christophe',
+    'aboutin2k1':'Antoine'
+  }[myEmail.split('@')[0]] || myName;
+
+  // Heartbeat every 30 seconds to mark myself as active
+  const updateHeartbeat = async ()=>{
+    if(!window._fbReady) return;
+    try{
+      const docId = 'presence_' + window._deviceId.slice(0,8);
+      await window._fbSetDoc(
+        window._fbDoc(window._fbDb, 'immocompta', docId),
+        {
+          name: displayName,
+          email: myEmail,
+          lastSeen: new Date().toISOString(),
+          device: window._deviceId
+        }
+      );
+    } catch(e){ /* silent */ }
+  };
+
+  // Initial + every 30s
+  updateHeartbeat();
+  _presenceHeartbeat = setInterval(updateHeartbeat, 30000);
+
+  // Watch other users
+  checkOtherUsers();
+  _presenceWatcher = setInterval(checkOtherUsers, 15000);
+}
+
+async function checkOtherUsers(){
+  if(!window._fbReady || !window._fbCurrentUser) return;
+  try{
+    // Read all presence_* documents (we know the 3 emails, so try common device IDs aren't practical)
+    // Instead, we use a shared presence document approach
+    // Actually, we already wrote each one to "presence_xxxx" — let's collect them via the index
+    // Simpler approach: store all presences in a single shared document
+    const snap = await window._fbGetDoc(window._fbDoc(window._fbDb, 'immocompta', 'presence_all'));
+    let all = snap.exists() ? (snap.data().users || {}) : {};
+    // Update my own entry
+    const myDeviceId = window._deviceId;
+    const myEmail = window._fbCurrentUser.email;
+    const displayName = {
+      'jimlabombe@hotmail.com':'Jim',
+      'jccaronrs18@gmail.com':'Jean-Christophe',
+      'aboutin2k1@gmail.com':'Antoine'
+    }[myEmail] || myEmail.split('@')[0];
+    all[myDeviceId] = {
+      name: displayName,
+      email: myEmail,
+      lastSeen: new Date().toISOString()
+    };
+    // Clean entries older than 90 seconds
+    const now = Date.now();
+    const STALE_MS = 90000;
+    const activeOthers = [];
+    Object.entries(all).forEach(([devId, info])=>{
+      const age = now - new Date(info.lastSeen).getTime();
+      if(age > STALE_MS){
+        delete all[devId];
+      } else if(devId !== myDeviceId && info.name){
+        // Check if name not already added (same person on multiple devices)
+        if(!activeOthers.includes(info.name)) activeOthers.push(info.name);
+      }
+    });
+    // Save back
+    await window._fbSetDoc(
+      window._fbDoc(window._fbDb, 'immocompta', 'presence_all'),
+      { users: all, _updated: new Date().toISOString() }
+    );
+    // Update UI
+    updatePresenceUI(activeOthers);
+  } catch(e){ /* silent */ }
+}
+
+function updatePresenceUI(others){
+  const indicator = $('presence-indicator');
+  const text = $('presence-text');
+  if(!indicator || !text) return;
+  if(others.length === 0){
+    indicator.style.display = 'none';
+  } else {
+    indicator.style.display = 'flex';
+    if(others.length === 1){
+      text.textContent = others[0] + ' est en ligne';
+    } else {
+      text.textContent = others.join(' et ') + ' sont en ligne';
+    }
+  }
+}
+
+function stopPresence(){
+  if(_presenceHeartbeat){ clearInterval(_presenceHeartbeat); _presenceHeartbeat=null; }
+  if(_presenceWatcher){ clearInterval(_presenceWatcher); _presenceWatcher=null; }
 }
 
 // ══════════════════════════════════════════════════
