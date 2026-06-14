@@ -2272,12 +2272,19 @@ function renderGlobal(){
     const c=calcImm(imm);totR+=c.totRev;totD+=c.totDep;totN+=c.net;
     DEP_CATS.forEach(cat=>{allDepByCat[cat]=(allDepByCat[cat]||0)+(c.depByCat[cat]||0);});
     REV_CATS.forEach(cat=>{allRevByCat[cat]=(allRevByCat[cat]||0)+(c.revByCat[cat]||0);});
-    // Sum payments by partner across all buildings
+    // Sum payments by partner across all buildings — from accounting dépenses
     filterByYear(imm.depenses||[]).forEach(d=>{
       const t=(d.montant||0)+(d.tax||0);
       const who=d.payepar||'Commun';
       paidByPartner[who]=(paidByPartner[who]||0)+t;
     });
+    // Also include manual shared expenses from Remboursements section
+    (imm.remboursements||[])
+      .filter(r=>r.date&&r.date.startsWith(String(activeYear))&&r.type==='depense')
+      .forEach(r=>{
+        const who=r.payepar||'Commun';
+        paidByPartner[who]=(paidByPartner[who]||0)+(r.montant||0);
+      });
   });
 
   // KPIs enrichis : 4 KPIs au lieu de 3
