@@ -19,6 +19,33 @@
   --r:10px;--rs:6px;--rl:16px;
   --sh:0 1px 4px rgba(0,0,0,.06);--shl:0 6px 24px rgba(0,0,0,.11);
 }
+
+/* ══ MODE SOMBRE ══ */
+html.dark-mode{
+  --ink:#e8e8f0;--ink2:#b8b8c8;--ink3:#7a7a8e;
+  --bg:#0f0f1a;--surf:#1a1a28;--surf2:#22222e;--surf3:#2a2a36;
+  --grn:#4ade80;--grn-l:rgba(74,222,128,.15);--grn-m:#22c55e;
+  --red:#f87171;--red-l:rgba(248,113,113,.15);--red-m:#ef4444;
+  --amb:#fbbf24;--amb-l:rgba(251,191,36,.15);--amb-m:#f59e0b;
+  --blu:#60a5fa;--blu-l:rgba(96,165,250,.15);--blu-m:#3b82f6;
+  --pur:#a78bfa;--pur-l:rgba(167,139,250,.15);--pur-m:#8b5cf6;
+  --bdr:#2a2a3a;--bdr2:#3a3a4e;
+  --sh:0 1px 4px rgba(0,0,0,.3);--shl:0 6px 24px rgba(0,0,0,.4);
+}
+html.dark-mode body{background:var(--bg)}
+html.dark-mode .modal{background:var(--surf)}
+html.dark-mode input,html.dark-mode select,html.dark-mode textarea{background:var(--surf2);color:var(--ink);border-color:var(--bdr)}
+html.dark-mode .card{background:var(--surf)}
+html.dark-mode .kpi{background:var(--surf)}
+html.dark-mode .imm-card{background:var(--surf)}
+html.dark-mode .scan-zone{background:linear-gradient(135deg,rgba(167,139,250,.08),rgba(96,165,250,.08))}
+html.dark-mode .btn-out{background:var(--surf2);color:var(--ink);border-color:var(--bdr2)}
+html.dark-mode .btn-out:hover{background:var(--surf3)}
+html.dark-mode th{background:var(--surf2);color:var(--ink2)}
+html.dark-mode .tfoot td{background:var(--surf3)}
+html.dark-mode .badge{background:var(--surf3)}
+html.dark-mode hr{border-color:var(--bdr)}
+html.dark-mode .lb{background:rgba(0,0,0,.9)}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.5}
 
 /* ── LAYOUT ── */
@@ -493,6 +520,7 @@ tbody tr:hover{background:var(--surf2)}
   <button class="rail-btn" id="nav-loc" onclick="showPanel('loc')"><span class="ic">👥</span> Locataires <span class="cnt" id="cnt-loc">0</span></button>
   <button class="rail-btn" id="nav-hyp" onclick="showPanel('hyp')"><span class="ic">🏦</span> Hypothèque</button>
   <button class="rail-btn" id="nav-remb" onclick="showPanel('remb')"><span class="ic">🤝</span> Remboursements</button>
+  <button class="rail-btn" id="nav-docs" onclick="showPanel('docs')"><span class="ic">📂</span> Documents <span class="cnt" id="cnt-docs">0</span></button>
 
   <div class="sep" style="margin:.5rem .75rem"></div>
   <div class="rail-section">Mes immeubles</div>
@@ -504,6 +532,7 @@ tbody tr:hover{background:var(--surf2)}
     <div style="width:6px;height:6px;background:#34a367;border-radius:99px;animation:pulse 2s infinite"></div>
     <span id="presence-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
   </div>
+  <button class="rail-btn" onclick="toggleDarkMode()" id="dark-toggle-btn" style="margin:.25rem .75rem;font-size:11px;padding:5px 8px;background:rgba(99,102,241,.12);color:#a5b4fc"><span class="ic" style="font-size:13px" id="dark-toggle-icon">🌙</span> <span id="dark-toggle-text">Mode sombre</span></button>
   <button class="rail-btn" onclick="openSecurityPanel()" style="margin:.25rem .75rem;background:rgba(245,158,11,.12);color:#fbbf24;font-size:11px;padding:5px 8px"><span class="ic" style="font-size:13px">🔒</span> Sécurité & Sauvegarde</button>
   <div class="rail-footer">
     <div class="drive-mini" style="margin-top:.5rem">
@@ -762,6 +791,11 @@ tbody tr:hover{background:var(--surf2)}
       <div id="remb-content"></div>
     </div>
 
+    <!-- ═══════════════════ PANEL DOCUMENTS ═══════════════════ -->
+    <div class="panel" id="panel-docs">
+      <div id="docs-content"></div>
+    </div>
+
   </div>
 </div>
 </div>
@@ -974,6 +1008,11 @@ tbody tr:hover{background:var(--surf2)}
         </select>
       </div>
       <div class="fg full"><label>Description / motif</label><input type="text" id="remb-desc" placeholder="ex. Achat outils — Canac"></div>
+      <div class="fg full">
+        <label>Preuve (PDF ou photo) — optionnel</label>
+        <input type="file" id="remb-file" accept="image/*,application/pdf" style="padding:6px;font-size:12px">
+        <div id="remb-current" style="font-size:11px;color:var(--ink3);margin-top:4px"></div>
+      </div>
     </div>
   </div>
   <div class="mf"><button class="btn btn-out" onclick="closeRembModal()">Annuler</button><button class="btn btn-ink" onclick="saveRemb()">✓ Enregistrer</button></div>
@@ -1032,6 +1071,39 @@ tbody tr:hover{background:var(--surf2)}
     <div id="act-log-content"></div>
   </div>
   <div class="mf"><button class="btn btn-out" onclick="closeActivityLog()">Fermer</button></div>
+</div>
+</div>
+
+<!-- ══ MODAL DOCUMENT ══ -->
+<div class="overlay" id="ov-doc" onclick="if(event.target.id==='ov-doc')closeDocModal()">
+<div class="modal narrow">
+  <div class="mh"><h2 id="doc-modal-title">Ajouter un document</h2><button class="xbtn" onclick="closeDocModal()">×</button></div>
+  <div class="mb">
+    <div class="fgrid">
+      <div class="fg full"><label>Titre / Description</label><input type="text" id="doc-titre" placeholder="ex. Police d'assurance habitation 2026"></div>
+      <div class="fg"><label>Catégorie</label>
+        <select id="doc-cat">
+          <option value="Assurance">🛡️ Assurance</option>
+          <option value="Titre de propriété">📜 Titre de propriété</option>
+          <option value="Contrat">📋 Contrat</option>
+          <option value="Hypothèque">🏦 Hypothèque</option>
+          <option value="Travaux">🔨 Travaux / Garanties</option>
+          <option value="Photos">📸 Photos</option>
+          <option value="Inspection">🔍 Inspection</option>
+          <option value="Légal">⚖️ Légal</option>
+          <option value="Autres">📁 Autres</option>
+        </select>
+      </div>
+      <div class="fg"><label>Date du document</label><input type="date" id="doc-date"></div>
+      <div class="fg full">
+        <label>Fichier (PDF ou photo)</label>
+        <input type="file" id="doc-file" accept="image/*,application/pdf" style="padding:6px;font-size:12px">
+        <div id="doc-current" style="font-size:11px;color:var(--ink3);margin-top:4px"></div>
+      </div>
+      <div class="fg full"><label>Notes</label><textarea id="doc-notes" rows="2" placeholder="Notes optionnelles"></textarea></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-out" onclick="closeDocModal()">Annuler</button><button class="btn btn-ink" onclick="saveDoc()">✓ Enregistrer</button></div>
 </div>
 </div>
 
@@ -1784,6 +1856,180 @@ function stopPresence(){
 }
 
 // ══════════════════════════════════════════════════
+// DOCUMENTS IMPORTANTS
+// ══════════════════════════════════════════════════
+const DOC_ICONS={'Assurance':'🛡️','Titre de propriété':'📜','Contrat':'📋','Hypothèque':'🏦','Travaux':'🔨','Photos':'📸','Inspection':'🔍','Légal':'⚖️','Autres':'📁'};
+let editDocId=null;
+
+function renderDocs(){
+  const imm=activeImm();
+  if(!imm){$('docs-content').innerHTML='<div class="empty">Sélectionnez un immeuble</div>';return;}
+  if(!imm.documents)imm.documents=[];
+  const docs=[...imm.documents].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  if($('cnt-docs'))$('cnt-docs').textContent=docs.length;
+
+  if(!docs.length){
+    $('docs-content').innerHTML=`<div class="empty" style="padding:3rem"><div style="font-size:3rem;margin-bottom:.5rem">📂</div><div style="font-size:14px;color:var(--ink2);margin-bottom:.5rem">Aucun document pour cet immeuble</div><div style="font-size:12px;color:var(--ink3)">Cliquez « + Ajouter un document » pour commencer</div></div>`;
+    return;
+  }
+
+  const grouped={};
+  docs.forEach(d=>{const k=d.cat||'Autres';if(!grouped[k])grouped[k]=[];grouped[k].push(d);});
+
+  let html='';
+  Object.entries(grouped).forEach(([cat,items])=>{
+    html+=`<div style="margin-bottom:1.25rem">
+      <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem">
+        <span style="font-size:1.1rem">${DOC_ICONS[cat]||'📁'}</span>${cat} <span style="color:var(--ink3);font-weight:400;font-size:11px">(${items.length})</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem">
+        ${items.map(d=>{
+          const isImg=d.file&&d.file.startsWith('https://')&&(d.fileName||'').match(/\.(jpg|jpeg|png|gif|webp)$/i);
+          const isPdf=(d.fileName||'').toLowerCase().endsWith('.pdf');
+          return `<div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rs);padding:.875rem;display:flex;flex-direction:column;gap:.5rem">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis">${d.titre||'Sans titre'}</div>
+                <div style="font-size:11px;color:var(--ink3);margin-top:2px">${d.date||'Sans date'}</div>
+              </div>
+              <div style="display:flex;gap:3px;flex-shrink:0">
+                <button class="btn btn-out btn-xs" onclick="openDocModal('${d.id}')" title="Modifier">✏</button>
+                <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #fca5a5" onclick="deleteDoc('${d.id}')" title="Supprimer">✕</button>
+              </div>
+            </div>
+            ${d.notes?`<div style="font-size:11px;color:var(--ink2);font-style:italic;background:var(--surf2);padding:6px 8px;border-radius:6px">${d.notes}</div>`:''}
+            ${d.file?`<button class="btn btn-ink btn-sm" onclick="window.open('${d.file}','_blank')" style="width:100%">${isPdf?'📄':isImg?'🖼️':'📎'} Ouvrir le fichier</button>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  $('docs-content').innerHTML=html;
+}
+
+function openDocModal(id){
+  editDocId=id||null;
+  ['doc-titre','doc-date','doc-notes'].forEach(i=>{const e=$(i);if(e)e.value='';});
+  $('doc-cat').value='Assurance';
+  $('doc-file').value='';
+  $('doc-current').innerHTML='';
+  if(id){
+    const imm=activeImm();
+    const doc=(imm?.documents||[]).find(d=>d.id===id);
+    if(doc){
+      $('doc-modal-title').textContent='Modifier le document';
+      $('doc-titre').value=doc.titre||'';
+      $('doc-cat').value=doc.cat||'Assurance';
+      $('doc-date').value=doc.date||'';
+      $('doc-notes').value=doc.notes||'';
+      if(doc.file){
+        $('doc-current').innerHTML=`✓ Fichier actuel : ${doc.fileName||'document'} <a href="#" onclick="event.preventDefault();window.open('${doc.file}','_blank')" style="color:var(--blu-m);margin-left:6px">Voir</a>`;
+      }
+    }
+  } else {
+    $('doc-modal-title').textContent='Ajouter un document';
+    $('doc-date').value=new Date().toISOString().slice(0,10);
+  }
+  $('ov-doc').classList.add('open');
+}
+function closeDocModal(){$('ov-doc').classList.remove('open');editDocId=null;}
+
+async function saveDoc(){
+  const imm=activeImm();if(!imm){toast('Sélectionnez un immeuble','err');return;}
+  if(!imm.documents)imm.documents=[];
+  const titre=$('doc-titre').value.trim();
+  if(!titre){toast('Titre requis','err');return;}
+
+  const docId=editDocId||uid();
+  let data={id:docId,titre,cat:$('doc-cat').value,date:$('doc-date').value,notes:$('doc-notes').value.trim()};
+
+  if(editDocId){
+    const existing=imm.documents.find(d=>d.id===editDocId);
+    if(existing){
+      if(existing.file)data.file=existing.file;
+      if(existing.fileName)data.fileName=existing.fileName;
+      if(existing.filePath)data.filePath=existing.filePath;
+    }
+  }
+
+  const file=$('doc-file').files[0];
+  if(file){
+    toast('☁ Téléversement...','ok');
+    try{
+      const reader=new FileReader();
+      const dataUrl=await new Promise((res,rej)=>{
+        reader.onload=e=>res(e.target.result);
+        reader.onerror=rej;
+        reader.readAsDataURL(file);
+      });
+      const ext=file.name.split('.').pop();
+      const path=`documents/${imm.id}/${docId}.${ext}`;
+      const url=await window._fbUploadImage(path,dataUrl);
+      data.file=url;
+      data.fileName=file.name;
+      data.filePath=path;
+    }catch(err){
+      console.error('Upload error:',err);
+      toast('Erreur téléversement','err');
+      return;
+    }
+  }
+
+  if(editDocId)imm.documents=imm.documents.map(d=>d.id===editDocId?data:d);
+  else imm.documents.push(data);
+  save();renderDocs();closeDocModal();
+  toast(editDocId?'Document modifié':'Document ajouté','ok');
+  logActivity(editDocId?'Document modifié':'Document ajouté', `${imm.name}: ${titre}`);
+}
+
+function deleteDoc(id){
+  const imm=activeImm();if(!imm)return;
+  const doc=imm.documents.find(d=>d.id===id);
+  if(!confirm(`Supprimer le document "${doc?.titre||''}"?`))return;
+  imm.documents=imm.documents.filter(d=>d.id!==id);
+  save();renderDocs();
+  toast('Document supprimé');
+  logActivity('Document supprimé', `${imm.name}: ${doc?.titre||''}`);
+}
+
+// ══════════════════════════════════════════════════
+// MODE SOMBRE
+// ══════════════════════════════════════════════════
+function applyDarkMode(enabled){
+  if(enabled){
+    document.documentElement.classList.add('dark-mode');
+    if($('dark-toggle-icon')){$('dark-toggle-icon').textContent='☀️';$('dark-toggle-text').textContent='Mode clair';}
+  } else {
+    document.documentElement.classList.remove('dark-mode');
+    if($('dark-toggle-icon')){$('dark-toggle-icon').textContent='🌙';$('dark-toggle-text').textContent='Mode sombre';}
+  }
+}
+
+function toggleDarkMode(){
+  const isDark=document.documentElement.classList.contains('dark-mode');
+  const newState=!isDark;
+  applyDarkMode(newState);
+  localStorage.setItem('ic_dark_mode', newState?'1':'0');
+}
+
+(function(){
+  const saved=localStorage.getItem('ic_dark_mode')==='1';
+  if(saved){
+    document.documentElement.classList.add('dark-mode');
+    setTimeout(()=>{
+      if($('dark-toggle-icon')){
+        $('dark-toggle-icon').textContent='☀️';
+        $('dark-toggle-text').textContent='Mode clair';
+      }
+    }, 500);
+  }
+})();
+
+// Update rail counter on setActive
+const _origSetActive=typeof setActive==='function'?setActive:null;
+
+// ══════════════════════════════════════════════════
 // INIT — create demo immeuble if empty
 // ══════════════════════════════════════════════════
 if(!immeubles.length){
@@ -1801,7 +2047,7 @@ function showPanel(id){
   document.querySelectorAll('.rail-btn').forEach(b=>b.classList.remove('active'));
   const nb=$('nav-'+id);if(nb)nb.classList.add('active');
 
-  const titles={global:'Tous les immeubles',factures:'Galerie des factures',dep:'Dépenses',rev:'Revenus',loc:'Locataires',hyp:'Hypothèque & valeur',remb:'Remboursements entre partenaires',res:'Résultats'};
+  const titles={global:'Tous les immeubles',factures:'Galerie des factures',dep:'Dépenses',rev:'Revenus',loc:'Locataires',hyp:'Hypothèque & valeur',remb:'Remboursements entre partenaires',docs:'Documents importants',res:'Résultats'};
   $('topbar-title').textContent=titles[id]||'';
   const imm=activeImm();
   $('topbar-sub').textContent=(id!=='global'&&id!=='factures'&&imm)?'— '+imm.name+' '+activeYear:'';
@@ -1815,6 +2061,7 @@ function showPanel(id){
     loc:`<button class="btn btn-ink btn-sm" onclick="openLocModal()">+ Ajouter locataire</button>`,
     hyp:`<button class="btn btn-ink btn-sm" onclick="openHypModal()">⚙ Configurer</button>`,
     remb:`<button class="btn btn-out btn-sm" onclick="openPartsModal()">⚙ Configurer les parts</button><button class="btn btn-out btn-sm" onclick="openRembModal('depense')">+ Dépense partagée</button><button class="btn btn-ink btn-sm" onclick="openRembModal('transfert')">🔄 Transfert direct</button>`,
+    docs:`<button class="btn btn-ink btn-sm" onclick="openDocModal()">+ Ajouter un document</button>`,
     res:`<button class="btn btn-out btn-sm" onclick="genResPDF()">📄 Rapport PDF résultats</button>`
   };
   $('topbar-actions').innerHTML=actions[id]||'';
@@ -1826,6 +2073,7 @@ function showPanel(id){
   else if(id==='loc')renderLoc();
   else if(id==='hyp')renderHyp();
   else if(id==='remb')renderRemb();
+  else if(id==='docs')renderDocs();
   else if(id==='res')renderRes();
 }
 
@@ -1844,6 +2092,7 @@ function renderRail(){
   $('cnt-dep').textContent=imm?(imm.depenses||[]).length:0;
   $('cnt-rev').textContent=imm?(imm.revenus||[]).length:0;
   if($('cnt-loc'))$('cnt-loc').textContent=imm?(imm.locataires||[]).length:0;
+  if($('cnt-docs'))$('cnt-docs').textContent=imm?(imm.documents||[]).length:0;
 }
 
 function setActive(id){
@@ -3305,6 +3554,8 @@ function openRembModal(type,id){
   $('remb-payepar').value='Jim';
   $('remb-from').value='Jim';
   $('remb-to').value='Antoine';
+  if($('remb-file'))$('remb-file').value='';
+  if($('remb-current'))$('remb-current').innerHTML='';
 
   if(type==='depense'){
     $('remb-modal-title').textContent=id?'Modifier la dépense partagée':'Nouvelle dépense partagée';
@@ -3333,13 +3584,16 @@ function openRembModal(type,id){
         $('remb-from').value=entry.from||'Jim';
         $('remb-to').value=entry.to||'Antoine';
       }
+      if(entry.proof){
+        $('remb-current').innerHTML=`✓ Fichier actuel : ${entry.proofName||'document'} <a href="#" onclick="event.preventDefault();window.open('${entry.proof}','_blank')" style="color:var(--blu-m);margin-left:6px">Voir</a>`;
+      }
     }
   }
   $('ov-remb').classList.add('open');
 }
 function closeRembModal(){$('ov-remb').classList.remove('open');editRembId=null;}
 
-function saveRemb(){
+async function saveRemb(){
   const imm=activeImm();if(!imm){toast('Sélectionnez un immeuble','err');return;}
   if(!imm.remboursements)imm.remboursements=[];
   const date=$('remb-date').value;
@@ -3347,7 +3601,8 @@ function saveRemb(){
   const desc=$('remb-desc').value.trim();
   if(!date||!mont||mont<=0){toast('Date et montant requis','err');return;}
 
-  let entry={id:editRembId||uid(),type:rembModalType,date,montant:mont,desc};
+  const entryId=editRembId||uid();
+  let entry={id:entryId,type:rembModalType,date,montant:mont,desc};
   if(rembModalType==='depense'){
     entry.payepar=$('remb-payepar').value;
   }else{
@@ -3356,6 +3611,40 @@ function saveRemb(){
     if(from===to){toast('Le payeur et le destinataire doivent être différents','err');return;}
     entry.from=from;
     entry.to=to;
+  }
+
+  // Preserve existing proof if editing
+  if(editRembId){
+    const existing=imm.remboursements.find(r=>r.id===editRembId);
+    if(existing){
+      if(existing.proof)entry.proof=existing.proof;
+      if(existing.proofName)entry.proofName=existing.proofName;
+      if(existing.proofPath)entry.proofPath=existing.proofPath;
+    }
+  }
+
+  // Handle file upload
+  const file=$('remb-file')?.files[0];
+  if(file){
+    toast('☁ Téléversement du fichier...','ok');
+    try{
+      const reader=new FileReader();
+      const dataUrl=await new Promise((res,rej)=>{
+        reader.onload=e=>res(e.target.result);
+        reader.onerror=rej;
+        reader.readAsDataURL(file);
+      });
+      const ext=file.name.split('.').pop();
+      const path=`remboursements/${imm.id}/${entryId}.${ext}`;
+      const url=await window._fbUploadImage(path,dataUrl);
+      entry.proof=url;
+      entry.proofName=file.name;
+      entry.proofPath=path;
+    }catch(err){
+      console.error('Upload error:',err);
+      toast('Erreur téléversement','err');
+      return;
+    }
   }
 
   if(editRembId)imm.remboursements=imm.remboursements.map(r=>r.id===editRembId?entry:r);
@@ -3523,7 +3812,7 @@ function renderRemb(){
                 <td style="padding:8px 12px">${details}</td>
                 <td style="padding:8px 12px;color:var(--ink2)">${r.desc||''}</td>
                 <td style="padding:8px 12px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${fmt(r.montant)}</td>
-                <td style="padding:4px 8px;white-space:nowrap"><button class="btn btn-out btn-xs" onclick="openRembModal('${r.type}','${r.id}')">✏</button> <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #fca5a5" onclick="deleteRemb('${r.id}')">✕</button></td>
+                <td style="padding:4px 8px;white-space:nowrap">${r.proof?`<button class="btn btn-xs" style="background:var(--blu-l);color:var(--blu);border:1px solid var(--blu-m)" onclick="window.open('${r.proof}','_blank')" title="Voir la preuve">📎</button> `:''}<button class="btn btn-out btn-xs" onclick="openRembModal('${r.type}','${r.id}')">✏</button> <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #fca5a5" onclick="deleteRemb('${r.id}')">✕</button></td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -3563,7 +3852,7 @@ function toast(msg,type=''){
 // ══════════════════════════════════════════════════
 // KEYBOARD
 // ══════════════════════════════════════════════════
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();closePartsModal();closeRembModal();closeSecurityPanel();closeActivityLog();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();closePartsModal();closeRembModal();closeSecurityPanel();closeActivityLog();closeDocModal();}});
 
 // ══════════════════════════════════════════════════
 // GOOGLE DRIVE
