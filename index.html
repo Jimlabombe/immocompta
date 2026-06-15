@@ -388,6 +388,51 @@ tbody tr:hover{background:var(--surf2)}
 .copy-btn:hover{background:var(--bdr)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
+/* ── CALENDRIER ÉCHÉANCES ── */
+.cal-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:.75rem 1rem}
+.cal-month-nav{display:flex;align-items:center;gap:.75rem}
+.cal-month-name{font-size:1.1rem;font-weight:700;min-width:160px;text-align:center}
+.cal-nav-btn{background:var(--surf2);border:1px solid var(--bdr2);width:32px;height:32px;border-radius:var(--rs);cursor:pointer;font-size:14px;color:var(--ink2);transition:.15s}
+.cal-nav-btn:hover{background:var(--bdr)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:.75rem}
+.cal-day-header{text-align:center;padding:6px;font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em}
+.cal-cell{aspect-ratio:1;background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--rs);padding:6px;display:flex;flex-direction:column;gap:3px;min-height:80px;overflow:hidden;position:relative;cursor:default}
+.cal-cell.empty{background:transparent;border:none}
+.cal-cell.today{background:var(--blu-l);border-color:var(--blu-m);box-shadow:0 0 0 1px var(--blu-m) inset}
+.cal-cell .day-num{font-size:13px;font-weight:600;color:var(--ink2)}
+.cal-cell.today .day-num{color:var(--blu);font-weight:700}
+.cal-event{font-size:10px;padding:2px 5px;border-radius:4px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;transition:.15s}
+.cal-event:hover{transform:scale(1.03);box-shadow:var(--sh)}
+.cal-event.bail{background:#dbeafe;color:#1e40af}
+.cal-event.assurance{background:#dcfce7;color:#166534}
+.cal-event.hypotheque{background:#fed7aa;color:#9a3412}
+.cal-event.taxes{background:#fee2e2;color:#991b1b}
+.cal-event.inspection{background:#e9d5ff;color:#6b21a8}
+.cal-event.travaux{background:#fef3c7;color:#92400e}
+.cal-event.autres{background:#e5e7eb;color:#374151}
+.cal-event.urgent{animation:pulse 1.5s infinite}
+.cal-event.termine{opacity:.4;text-decoration:line-through}
+
+/* List view for upcoming */
+.ech-list-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:.875rem 1rem;margin-bottom:.5rem;display:flex;align-items:center;gap:1rem;border-left:4px solid var(--bdr)}
+.ech-list-card.urgent{border-left-color:var(--red);background:linear-gradient(90deg,var(--red-l),var(--surf) 40%)}
+.ech-list-card.soon{border-left-color:var(--amb-m);background:linear-gradient(90deg,var(--amb-l),var(--surf) 40%)}
+.ech-list-card.ok{border-left-color:var(--grn-m)}
+.ech-list-card.termine{opacity:.5;border-left-color:var(--ink3)}
+.ech-icon{font-size:1.5rem;flex-shrink:0}
+.ech-info{flex:1;min-width:0}
+.ech-titre{font-weight:700;color:var(--ink);font-size:14px}
+.ech-meta{font-size:11px;color:var(--ink3);margin-top:2px}
+.ech-days{font-size:1.5rem;font-weight:700;text-align:right;min-width:80px}
+.ech-days .lbl-small{font-size:10px;color:var(--ink3);font-weight:500;display:block;text-transform:uppercase}
+
+/* Dark mode */
+html.dark-mode .cal-cell{background:var(--surf2)}
+html.dark-mode .cal-cell.today{background:rgba(96,165,250,.15)}
+html.dark-mode .cal-cell .day-num{color:var(--text-main)}
+html.dark-mode .ech-titre{color:var(--text-main)}
+
+
 /* ══════════════════════════════════════════════════
    MODE MOBILE — s'active automatiquement sur écrans < 768px
    ══════════════════════════════════════════════════ */
@@ -538,6 +583,7 @@ tbody tr:hover{background:var(--surf2)}
   <div class="rail-section">Vue globale</div>
   <button class="rail-btn active" id="nav-global" onclick="showPanel('global')"><span class="ic">🏢</span> Tous les immeubles</button>
   <button class="rail-btn" id="nav-factures" onclick="showPanel('factures')"><span class="ic">📎</span> Galerie factures</button>
+  <button class="rail-btn" id="nav-echglobal" onclick="showPanel('echglobal')"><span class="ic">📅</span> Calendrier global</button>
 
   <div class="sep" style="margin:.5rem .75rem"></div>
   <div class="rail-section">Immeuble actif</div>
@@ -548,6 +594,7 @@ tbody tr:hover{background:var(--surf2)}
   <button class="rail-btn" id="nav-hyp" onclick="showPanel('hyp')"><span class="ic">🏦</span> Hypothèque</button>
   <button class="rail-btn" id="nav-remb" onclick="showPanel('remb')"><span class="ic">🤝</span> Remboursements</button>
   <button class="rail-btn" id="nav-docs" onclick="showPanel('docs')"><span class="ic">📂</span> Documents <span class="cnt" id="cnt-docs">0</span></button>
+  <button class="rail-btn" id="nav-ech" onclick="showPanel('ech')"><span class="ic">📅</span> Échéances <span class="cnt" id="cnt-ech">0</span></button>
 
   <div class="sep" style="margin:.5rem .75rem"></div>
   <div class="rail-section">Mes immeubles</div>
@@ -821,6 +868,16 @@ tbody tr:hover{background:var(--surf2)}
     <!-- ═══════════════════ PANEL DOCUMENTS ═══════════════════ -->
     <div class="panel" id="panel-docs">
       <div id="docs-content"></div>
+    </div>
+
+    <!-- ═══════════════════ PANEL ÉCHÉANCES (par immeuble) ═══════════════════ -->
+    <div class="panel" id="panel-ech">
+      <div id="ech-content"></div>
+    </div>
+
+    <!-- ═══════════════════ PANEL CALENDRIER GLOBAL ═══════════════════ -->
+    <div class="panel" id="panel-echglobal">
+      <div id="echglobal-content"></div>
     </div>
 
   </div>
@@ -1131,6 +1188,48 @@ tbody tr:hover{background:var(--surf2)}
     </div>
   </div>
   <div class="mf"><button class="btn btn-out" onclick="closeDocModal()">Annuler</button><button class="btn btn-ink" onclick="saveDoc()">✓ Enregistrer</button></div>
+</div>
+</div>
+
+<!-- ══ MODAL ÉCHÉANCE ══ -->
+<div class="overlay" id="ov-ech" onclick="if(event.target.id==='ov-ech')closeEchModal()">
+<div class="modal narrow">
+  <div class="mh"><h2 id="ech-modal-title">Ajouter une échéance</h2><button class="xbtn" onclick="closeEchModal()">×</button></div>
+  <div class="mb">
+    <div class="fgrid">
+      <div class="fg full"><label>Titre / Description</label><input type="text" id="ech-titre" placeholder="ex. Renouvellement bail Jean Tremblay"></div>
+      <div class="fg"><label>Type</label>
+        <select id="ech-type">
+          <option value="Bail">🏠 Bail (fin de bail)</option>
+          <option value="Assurance">🛡️ Assurance (renouvellement)</option>
+          <option value="Hypothèque">🏦 Hypothèque (renouvellement)</option>
+          <option value="Taxes">🏛 Taxes (échéance)</option>
+          <option value="Inspection">🔍 Inspection</option>
+          <option value="Travaux">🔨 Travaux planifiés</option>
+          <option value="Autres">📌 Autres</option>
+        </select>
+      </div>
+      <div class="fg"><label>Date d'échéance</label><input type="date" id="ech-date"></div>
+      <div class="fg"><label>Rappel</label>
+        <select id="ech-rappel">
+          <option value="7">7 jours avant</option>
+          <option value="14">14 jours avant</option>
+          <option value="30">30 jours avant</option>
+          <option value="60" selected>60 jours avant</option>
+          <option value="90">90 jours avant</option>
+          <option value="120">120 jours avant</option>
+        </select>
+      </div>
+      <div class="fg"><label>Statut</label>
+        <select id="ech-statut">
+          <option value="actif">À venir</option>
+          <option value="termine">Terminé / Renouvelé</option>
+        </select>
+      </div>
+      <div class="fg full"><label>Notes</label><textarea id="ech-notes" rows="2" placeholder="Notes optionnelles (montant, contact, etc.)"></textarea></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-out" onclick="closeEchModal()">Annuler</button><button class="btn btn-ink" onclick="saveEch()">✓ Enregistrer</button></div>
 </div>
 </div>
 
@@ -2021,6 +2120,221 @@ function deleteDoc(id){
 }
 
 // ══════════════════════════════════════════════════
+// ÉCHÉANCES (CALENDRIER)
+// ══════════════════════════════════════════════════
+const ECH_TYPES={
+  'Bail':{icon:'🏠',cls:'bail',color:'#3b82f6'},
+  'Assurance':{icon:'🛡️',cls:'assurance',color:'#16a34a'},
+  'Hypothèque':{icon:'🏦',cls:'hypotheque',color:'#ea580c'},
+  'Taxes':{icon:'🏛',cls:'taxes',color:'#dc2626'},
+  'Inspection':{icon:'🔍',cls:'inspection',color:'#9333ea'},
+  'Travaux':{icon:'🔨',cls:'travaux',color:'#d97706'},
+  'Autres':{icon:'📌',cls:'autres',color:'#6b7280'}
+};
+let editEchId=null;
+let _calCursor={year:new Date().getFullYear(),month:new Date().getMonth()};
+
+function daysBetween(date1,date2){
+  const oneDay=24*60*60*1000;
+  return Math.round((date2.getTime()-date1.getTime())/oneDay);
+}
+
+function getAllEcheances(){
+  // Combine: manual éch from each immeuble + auto-derived from leases, mortgages, etc.
+  const all=[];
+  immeubles.forEach(imm=>{
+    // Manual entries
+    (imm.echeances||[]).forEach(e=>{
+      all.push({...e,immId:imm.id,immName:imm.name});
+    });
+  });
+  return all;
+}
+
+function renderEch(){
+  const imm=activeImm();
+  if(!imm){$('ech-content').innerHTML='<div class="empty">Sélectionnez un immeuble</div>';return;}
+  if(!imm.echeances)imm.echeances=[];
+  const echs=imm.echeances.map(e=>({...e,immId:imm.id,immName:imm.name}));
+  if($('cnt-ech'))$('cnt-ech').textContent=echs.length;
+  $('ech-content').innerHTML=buildEchView(echs,imm.name);
+}
+
+function renderEchGlobal(){
+  const all=getAllEcheances();
+  $('echglobal-content').innerHTML=buildEchView(all,'Tous les immeubles',true);
+}
+
+function buildEchView(echs,title,isGlobal){
+  const today=new Date();today.setHours(0,0,0,0);
+  // Sort by date asc
+  const upcoming=echs.filter(e=>e.statut!=='termine'&&e.date).map(e=>{
+    const d=new Date(e.date);
+    const days=daysBetween(today,d);
+    return {...e,days,dateObj:d};
+  }).sort((a,b)=>a.dateObj-b.dateObj);
+
+  const past=echs.filter(e=>e.statut==='termine'||(e.date&&new Date(e.date)<today));
+
+  // Calendar nav
+  const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const monthName=MOIS[_calCursor.month]+' '+_calCursor.year;
+
+  // Build calendar grid for current cursor month
+  const firstDay=new Date(_calCursor.year,_calCursor.month,1);
+  const lastDay=new Date(_calCursor.year,_calCursor.month+1,0);
+  const startWeekday=firstDay.getDay(); // 0=Sunday
+  const daysInMonth=lastDay.getDate();
+  const todayStr=today.toISOString().slice(0,10);
+
+  const eventsByDay={};
+  echs.forEach(e=>{
+    if(!e.date)return;
+    if(e.date.slice(0,7)===String(_calCursor.year)+'-'+String(_calCursor.month+1).padStart(2,'0')){
+      const day=parseInt(e.date.slice(8,10));
+      if(!eventsByDay[day])eventsByDay[day]=[];
+      eventsByDay[day].push(e);
+    }
+  });
+
+  let calHtml=`<div class="cal-grid">
+    ${['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'].map(d=>`<div class="cal-day-header">${d}</div>`).join('')}`;
+  // Empty cells before first day
+  for(let i=0;i<startWeekday;i++){
+    calHtml+=`<div class="cal-cell empty"></div>`;
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=String(_calCursor.year)+'-'+String(_calCursor.month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const isToday=ds===todayStr;
+    const events=eventsByDay[d]||[];
+    let eventsHtml='';
+    events.slice(0,3).forEach(e=>{
+      const typeInfo=ECH_TYPES[e.type]||ECH_TYPES['Autres'];
+      const isUrgent=e.statut!=='termine'&&Math.abs(daysBetween(today,new Date(e.date)))<=7;
+      const cls=`cal-event ${typeInfo.cls} ${e.statut==='termine'?'termine':''} ${isUrgent?'urgent':''}`;
+      const label=isGlobal?`${typeInfo.icon} ${e.immName.slice(0,15)}`:`${typeInfo.icon} ${(e.titre||'').slice(0,18)}`;
+      eventsHtml+=`<div class="${cls}" title="${e.titre||''} - ${e.immName||''}" onclick="${isGlobal?`setActive('${e.immId}');showPanel('ech')`:`openEchModal('${e.id}')`}">${label}</div>`;
+    });
+    if(events.length>3)eventsHtml+=`<div style="font-size:9px;color:var(--ink3);text-align:center;margin-top:2px">+${events.length-3} autres</div>`;
+    calHtml+=`<div class="cal-cell ${isToday?'today':''}"><div class="day-num">${d}</div>${eventsHtml}</div>`;
+  }
+  calHtml+=`</div>`;
+
+  // Upcoming list (next 6 months)
+  const upcomingSoon=upcoming.filter(e=>e.days>=0&&e.days<=180);
+  let listHtml='';
+  if(upcomingSoon.length===0){
+    listHtml=`<div style="text-align:center;padding:1.5rem;color:var(--ink3);font-size:13px">Aucune échéance dans les 6 prochains mois</div>`;
+  } else {
+    listHtml=upcomingSoon.map(e=>{
+      const typeInfo=ECH_TYPES[e.type]||ECH_TYPES['Autres'];
+      const rappel=parseInt(e.rappel||60);
+      const cls=e.days<=7?'urgent':e.days<=rappel?'soon':'ok';
+      const daysLabel=e.days===0?'Aujourd\'hui':e.days===1?'Demain':`${e.days} jours`;
+      const daysColor=e.days<=7?'var(--red)':e.days<=rappel?'var(--amb-m)':'var(--grn)';
+      return `<div class="ech-list-card ${cls}" onclick="${isGlobal?`setActive('${e.immId}');showPanel('ech')`:`openEchModal('${e.id}')`}" style="cursor:pointer">
+        <div class="ech-icon">${typeInfo.icon}</div>
+        <div class="ech-info">
+          <div class="ech-titre">${e.titre||'Sans titre'}</div>
+          <div class="ech-meta">${e.type}${isGlobal?' · '+e.immName:''} · ${e.date}${e.notes?' · '+e.notes.slice(0,40):''}</div>
+        </div>
+        <div class="ech-days" style="color:${daysColor}">${daysLabel}<span class="lbl-small">avant</span></div>
+      </div>`;
+    }).join('');
+  }
+
+  return `
+    <!-- Calendrier mensuel -->
+    <div class="cal-toolbar">
+      <div class="cal-month-nav">
+        <button class="cal-nav-btn" onclick="navCal(-1)">‹</button>
+        <div class="cal-month-name">${monthName}</div>
+        <button class="cal-nav-btn" onclick="navCal(1)">›</button>
+        <button class="btn btn-out btn-sm" onclick="navCal(0)">Aujourd'hui</button>
+      </div>
+      <div style="display:flex;gap:.5rem;font-size:11px;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#3b82f6;border-radius:2px"></span>Bail</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#16a34a;border-radius:2px"></span>Assurance</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#ea580c;border-radius:2px"></span>Hypothèque</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:#dc2626;border-radius:2px"></span>Taxes</span>
+      </div>
+    </div>
+    ${calHtml}
+    <div style="margin-top:1.5rem;font-size:14px;font-weight:700;margin-bottom:.5rem">📋 Prochaines échéances (6 mois)</div>
+    ${listHtml}`;
+}
+
+function navCal(delta){
+  if(delta===0){
+    const now=new Date();
+    _calCursor={year:now.getFullYear(),month:now.getMonth()};
+  } else {
+    _calCursor.month+=delta;
+    if(_calCursor.month>11){_calCursor.month=0;_calCursor.year++;}
+    if(_calCursor.month<0){_calCursor.month=11;_calCursor.year--;}
+  }
+  // Re-render whichever panel is active
+  const activePanel=document.querySelector('.panel.active');
+  if(activePanel?.id==='panel-ech')renderEch();
+  else if(activePanel?.id==='panel-echglobal')renderEchGlobal();
+}
+
+function openEchModal(id){
+  editEchId=id||null;
+  ['ech-titre','ech-date','ech-notes'].forEach(i=>{const e=$(i);if(e)e.value='';});
+  $('ech-type').value='Bail';
+  $('ech-rappel').value='60';
+  $('ech-statut').value='actif';
+  if(id){
+    const imm=activeImm();
+    const ech=(imm?.echeances||[]).find(e=>e.id===id);
+    if(ech){
+      $('ech-modal-title').textContent='Modifier l\'échéance';
+      $('ech-titre').value=ech.titre||'';
+      $('ech-type').value=ech.type||'Bail';
+      $('ech-date').value=ech.date||'';
+      $('ech-rappel').value=ech.rappel||'60';
+      $('ech-statut').value=ech.statut||'actif';
+      $('ech-notes').value=ech.notes||'';
+    }
+  } else {
+    $('ech-modal-title').textContent='Ajouter une échéance';
+  }
+  $('ov-ech').classList.add('open');
+}
+function closeEchModal(){$('ov-ech').classList.remove('open');editEchId=null;}
+
+function saveEch(){
+  const imm=activeImm();if(!imm){toast('Sélectionnez un immeuble','err');return;}
+  if(!imm.echeances)imm.echeances=[];
+  const titre=$('ech-titre').value.trim();
+  const date=$('ech-date').value;
+  if(!titre||!date){toast('Titre et date requis','err');return;}
+  const data={
+    id:editEchId||uid(),
+    titre,
+    type:$('ech-type').value,
+    date,
+    rappel:$('ech-rappel').value,
+    statut:$('ech-statut').value,
+    notes:$('ech-notes').value.trim()
+  };
+  if(editEchId)imm.echeances=imm.echeances.map(e=>e.id===editEchId?data:e);
+  else imm.echeances.push(data);
+  save();renderEch();closeEchModal();
+  toast(editEchId?'Échéance modifiée':'Échéance ajoutée','ok');
+  logActivity(editEchId?'Échéance modifiée':'Échéance ajoutée', `${imm.name}: ${titre}`);
+}
+
+function deleteEch(id){
+  const imm=activeImm();if(!imm)return;
+  const e=(imm.echeances||[]).find(x=>x.id===id);
+  if(!confirm(`Supprimer l'échéance "${e?.titre||''}"?`))return;
+  imm.echeances=imm.echeances.filter(x=>x.id!==id);
+  save();renderEch();toast('Échéance supprimée');
+}
+
+// ══════════════════════════════════════════════════
 // MODE SOMBRE
 // ══════════════════════════════════════════════════
 function applyDarkMode(enabled){
@@ -2074,7 +2388,7 @@ function showPanel(id){
   document.querySelectorAll('.rail-btn').forEach(b=>b.classList.remove('active'));
   const nb=$('nav-'+id);if(nb)nb.classList.add('active');
 
-  const titles={global:'Tous les immeubles',factures:'Galerie des factures',dep:'Dépenses',rev:'Revenus',loc:'Locataires',hyp:'Hypothèque & valeur',remb:'Remboursements entre partenaires',docs:'Documents importants',res:'Résultats'};
+  const titles={global:'Tous les immeubles',factures:'Galerie des factures',echglobal:'📅 Calendrier global des échéances',dep:'Dépenses',rev:'Revenus',loc:'Locataires',hyp:'Hypothèque & valeur',remb:'Remboursements entre partenaires',docs:'Documents importants',ech:'📅 Échéances',res:'Résultats'};
   $('topbar-title').textContent=titles[id]||'';
   const imm=activeImm();
   $('topbar-sub').textContent=(id!=='global'&&id!=='factures'&&imm)?'— '+imm.name+' '+activeYear:'';
@@ -2089,18 +2403,22 @@ function showPanel(id){
     hyp:`<button class="btn btn-ink btn-sm" onclick="openHypModal()">⚙ Configurer</button>`,
     remb:`<button class="btn btn-out btn-sm" onclick="openPartsModal()">⚙ Configurer les parts</button><button class="btn btn-out btn-sm" onclick="openRembModal('depense')">+ Dépense partagée</button><button class="btn btn-ink btn-sm" onclick="openRembModal('transfert')">🔄 Transfert direct</button>`,
     docs:`<button class="btn btn-ink btn-sm" onclick="openDocModal()">+ Ajouter un document</button>`,
+    ech:`<button class="btn btn-ink btn-sm" onclick="openEchModal()">+ Ajouter une échéance</button>`,
+    echglobal:'',
     res:`<button class="btn btn-out btn-sm" onclick="genResPDF()">📄 Rapport PDF résultats</button>`
   };
   $('topbar-actions').innerHTML=actions[id]||'';
 
   if(id==='global')renderGlobal();
   else if(id==='factures')renderGallery();
+  else if(id==='echglobal')renderEchGlobal();
   else if(id==='dep')renderDep();
   else if(id==='rev'){renderRev();}
   else if(id==='loc')renderLoc();
   else if(id==='hyp')renderHyp();
   else if(id==='remb')renderRemb();
   else if(id==='docs')renderDocs();
+  else if(id==='ech')renderEch();
   else if(id==='res')renderRes();
 }
 
@@ -3879,7 +4197,7 @@ function toast(msg,type=''){
 // ══════════════════════════════════════════════════
 // KEYBOARD
 // ══════════════════════════════════════════════════
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();closePartsModal();closeRembModal();closeSecurityPanel();closeActivityLog();closeDocModal();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeLB();closeScan();closeMan();closeBail();closeAddImm();closeDriveSetup();closeLocModal();closeHypModal();closePartsModal();closeRembModal();closeSecurityPanel();closeActivityLog();closeDocModal();closeEchModal();}});
 
 // ══════════════════════════════════════════════════
 // GOOGLE DRIVE
