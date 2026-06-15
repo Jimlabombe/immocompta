@@ -4212,12 +4212,19 @@ function genPDF(type){
 function genResPDF(){
   const imm=activeImm();if(!imm){toast('Aucun immeuble actif','err');return;}
   const annee=activeYear;
+  // Get ownership share from slider
+  const partPct=parseInt($('part-slider')?.value||100);
+  const partRatio=partPct/100;
   const deps=filterByYear(imm.depenses||[]);
   const revs=filterByYear(imm.revenus||[]);
   const totDep=deps.reduce((s,d)=>s+(d.montant||0)+(d.tax||0),0);
   const totRev=revs.reduce((s,r)=>s+(r.montant||0),0);
   const net=totRev-totDep;
   const rend=totRev>0?((net/totRev)*100).toFixed(1)+'%':'—';
+  // Ma part
+  const monRev=totRev*partRatio;
+  const monDep=totDep*partRatio;
+  const monNet=net*partRatio;
   const depByCat={},revByCat={};
   const DEP_CATS=['Hypothèque / Intérêts','Taxes municipales','Assurances','Entretien & réparations','Frais de gestion','Services publics','Déneigement / Aménagement','Honoraires professionnels','Publicité','Améliorations','Autres'];
   const REV_CATS=['Loyer mensuel','Stationnement','Buanderie','Dépôt de garantie','Subvention','Remboursement assurance','Autres revenus'];
@@ -4268,12 +4275,21 @@ function genResPDF(){
     <div style="font-size:1.6rem;font-weight:700;margin-bottom:.5rem">État des résultats</div>
     <div style="font-size:1.1rem;opacity:.7">${imm.name}${imm.addr?' · '+imm.addr:''}</div>
     <div style="font-size:1rem;opacity:.5;margin-top:.25rem">Exercice financier ${annee}</div>
+    ${partPct<100?`<div style="margin-top:.75rem;background:rgba(124,58,237,.2);border:1px solid rgba(167,139,250,.4);padding:6px 16px;border-radius:99px;display:inline-block;font-size:12px;font-weight:600">Ma quote-part : ${partPct}%</div>`:''}
     <div class="kpi-row">
       <div class="kpi"><div class="val" style="color:#34a367">${fmt(totRev)}</div><div class="lbl">Revenus totaux</div></div>
       <div class="kpi"><div class="val" style="color:#e05252">${fmt(totDep)}</div><div class="lbl">Dépenses totales</div></div>
       <div class="kpi"><div class="val" style="color:${net>=0?'#34a367':'#e05252'}">${fmt(net)}</div><div class="lbl">Résultat net</div></div>
       <div class="kpi"><div class="val">${rend}</div><div class="lbl">Rendement net</div></div>
     </div>
+    ${partPct<100?`<div style="margin-top:1.5rem;background:rgba(124,58,237,.15);border:1px solid rgba(167,139,250,.4);border-radius:10px;padding:1rem 1.5rem">
+      <div style="font-size:11px;opacity:.6;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Selon ma quote-part (${partPct}%)</div>
+      <div style="display:flex;gap:1.5rem;justify-content:center">
+        <div><span style="font-size:11px;opacity:.7">Mes revenus</span><div style="font-size:1.1rem;font-weight:700;color:#6ee7b7">${fmt(monRev)}</div></div>
+        <div><span style="font-size:11px;opacity:.7">Mes dépenses</span><div style="font-size:1.1rem;font-weight:700;color:#fca5a5">${fmt(monDep)}</div></div>
+        <div><span style="font-size:11px;opacity:.7">Mon résultat net</span><div style="font-size:1.1rem;font-weight:700;color:${monNet>=0?'#6ee7b7':'#fca5a5'}">${fmt(monNet)}</div></div>
+      </div>
+    </div>`:''}
     <div style="margin-top:3rem;font-size:11px;opacity:.3">Généré le ${new Date().toLocaleDateString('fr-CA')} · ImmoCompta Pro</div>
   </div>
   <div class="page">
@@ -4289,6 +4305,12 @@ function genResPDF(){
         ${DEP_CATS.map(cat=>{const v=depByCat[cat]||0;if(!v)return '';return `<tr><td style="padding-left:1.5rem">${cat}</td><td class="r" style="color:#b91c1c">${fmt(v)}</td><td class="r pct">${totDep?((v/totDep)*100).toFixed(1)+'%':''}</td></tr>`;}).join('')}
         <tr class="total-dep"><td>TOTAL DÉPENSES (TTC)</td><td class="r">${fmt(totDep)}</td><td class="r">100%</td></tr>
         <tr class="net-row"><td>RÉSULTAT NET</td><td class="r ${net>=0?'pos':'neg'}">${fmt(net)}</td><td class="r">${rend}</td></tr>
+        ${partPct<100?`
+        <tr><td colspan="3" style="padding:8px"></td></tr>
+        <tr class="sec-header" style="background:#ede9fe!important;color:#5b21b6"><td colspan="3">🏛 MA QUOTE-PART (${partPct}%)</td></tr>
+        <tr><td style="padding-left:1.5rem">Mes revenus</td><td class="r" style="color:#1e6b47">${fmt(monRev)}</td><td class="r pct">${partPct}% de ${fmt(totRev)}</td></tr>
+        <tr><td style="padding-left:1.5rem">Mes dépenses</td><td class="r" style="color:#b91c1c">${fmt(monDep)}</td><td class="r pct">${partPct}% de ${fmt(totDep)}</td></tr>
+        <tr style="background:#ede9fe!important"><td style="font-weight:700;color:#5b21b6">MON RÉSULTAT NET</td><td class="r" style="color:${monNet>=0?'#1e6b47':'#b91c1c'};font-weight:700">${fmt(monNet)}</td><td class="r pct" style="color:#5b21b6;font-weight:700">${partPct}%</td></tr>`:''}
       </tbody>
     </table>
     <div class="sign-section">
