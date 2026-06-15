@@ -778,10 +778,10 @@ tbody tr:hover{background:var(--surf2)}
       </div>
       <div class="part-box">
         <h4>🏛 Ma part de propriété</h4>
-        <div class="part-row">
-          <label>Ma part :</label>
-          <input type="range" min="1" max="100" value="100" id="part-slider" oninput="updatePart()">
-          <div class="part-pct" id="part-pct-lbl">100%</div>
+        <div class="part-row" style="gap:.75rem">
+          <label>Ma quote-part :</label>
+          <input type="number" min="0" max="100" step="0.01" value="100" id="part-slider" oninput="updatePart()" style="width:100px;padding:6px 10px;font-size:14px;border:1px solid var(--bdr2);border-radius:var(--rs);text-align:right;font-weight:600">
+          <div class="part-pct" id="part-pct-lbl">%</div>
         </div>
         <div class="part-kpis">
           <div class="part-kpi"><div class="lbl">Revenus (ma part)</div><div class="vl" id="pr-rev">—</div></div>
@@ -2514,8 +2514,8 @@ function buildLineChart(monthData,cumData,cumMax,months){
 }
 
 function updatePart(){
-  const pct=parseInt($('part-slider').value)/100;
-  $('part-pct-lbl').textContent=Math.round(pct*100)+'%';
+  const pct=(parseFloat($('part-slider').value)||0)/100;
+  $('part-pct-lbl').textContent='%';
   const imm=activeImm();if(!imm)return;
   const c=calcImm(imm);
   $('pr-rev').textContent=fmt(c.totRev*pct);
@@ -4212,8 +4212,8 @@ function genPDF(type){
 function genResPDF(){
   const imm=activeImm();if(!imm){toast('Aucun immeuble actif','err');return;}
   const annee=activeYear;
-  // Get ownership share from slider
-  const partPct=parseInt($('part-slider')?.value||100);
+  // Get ownership share from input (supports decimals like 33.33)
+  const partPct=parseFloat($('part-slider')?.value||100);
   const partRatio=partPct/100;
   const deps=filterByYear(imm.depenses||[]);
   const revs=filterByYear(imm.revenus||[]);
