@@ -22,7 +22,10 @@
 
 /* ══ MODE SOMBRE ══ */
 html.dark-mode{
-  --ink:#e8e8f0;--ink2:#b8b8c8;--ink3:#7a7a8e;
+  /* --ink reste bleu marin foncé comme en mode clair pour garder l'identité visuelle */
+  --ink:#1a1a2e;
+  /* Mais les textes principaux deviennent clairs */
+  --ink2:#b8b8c8;--ink3:#7a7a8e;
   --bg:#0f0f1a;--surf:#1a1a28;--surf2:#22222e;--surf3:#2a2a36;
   --grn:#4ade80;--grn-l:rgba(74,222,128,.15);--grn-m:#22c55e;
   --red:#f87171;--red-l:rgba(248,113,113,.15);--red-m:#ef4444;
@@ -31,21 +34,33 @@ html.dark-mode{
   --pur:#a78bfa;--pur-l:rgba(167,139,250,.15);--pur-m:#8b5cf6;
   --bdr:#2a2a3a;--bdr2:#3a3a4e;
   --sh:0 1px 4px rgba(0,0,0,.3);--shl:0 6px 24px rgba(0,0,0,.4);
+  /* Texte principal blanc cassé */
+  --text-main:#e8e8f0;
 }
-html.dark-mode body{background:var(--bg)}
-html.dark-mode .modal{background:var(--surf)}
-html.dark-mode input,html.dark-mode select,html.dark-mode textarea{background:var(--surf2);color:var(--ink);border-color:var(--bdr)}
-html.dark-mode .card{background:var(--surf)}
-html.dark-mode .kpi{background:var(--surf)}
-html.dark-mode .imm-card{background:var(--surf)}
+html.dark-mode body{background:var(--bg);color:var(--text-main)}
+html.dark-mode .modal{background:var(--surf);color:var(--text-main)}
+html.dark-mode input,html.dark-mode select,html.dark-mode textarea{background:var(--surf2);color:var(--text-main);border-color:var(--bdr)}
+html.dark-mode .card{background:var(--surf);color:var(--text-main)}
+html.dark-mode .kpi{background:var(--surf);color:var(--text-main)}
+html.dark-mode .imm-card{background:var(--surf);color:var(--text-main)}
 html.dark-mode .scan-zone{background:linear-gradient(135deg,rgba(167,139,250,.08),rgba(96,165,250,.08))}
-html.dark-mode .btn-out{background:var(--surf2);color:var(--ink);border-color:var(--bdr2)}
+html.dark-mode .btn-out{background:var(--surf2);color:var(--text-main);border-color:var(--bdr2)}
 html.dark-mode .btn-out:hover{background:var(--surf3)}
 html.dark-mode th{background:var(--surf2);color:var(--ink2)}
+html.dark-mode td{color:var(--text-main)}
 html.dark-mode .tfoot td{background:var(--surf3)}
-html.dark-mode .badge{background:var(--surf3)}
+html.dark-mode .badge{background:var(--surf3);color:var(--text-main)}
 html.dark-mode hr{border-color:var(--bdr)}
 html.dark-mode .lb{background:rgba(0,0,0,.9)}
+/* Garder le texte du panneau de gauche (rail) inchangé puisqu'il utilise --ink en background */
+html.dark-mode .topbar{background:var(--surf);border-color:var(--bdr)}
+html.dark-mode .topbar-title,html.dark-mode .topbar-sub{color:var(--text-main)}
+/* Les valeurs principales restent visibles */
+html.dark-mode .val,html.dark-mode strong{color:inherit}
+html.dark-mode h1,html.dark-mode h2,html.dark-mode h3,html.dark-mode h4{color:var(--text-main)}
+html.dark-mode .res-section-title{color:var(--text-main)}
+/* Le bouton "Année" reste bleu marin */
+html.dark-mode #year-display{background:#1a1a2e !important;color:#fff !important}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.5}
 
 /* ── LAYOUT ── */
