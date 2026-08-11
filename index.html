@@ -739,6 +739,10 @@ html.dark-mode .ech-titre{color:var(--text-main)}
       <div id="year-picker" style="display:none;position:absolute;top:52px;left:50%;transform:translateX(-50%);background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--shl);z-index:100;padding:.5rem;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:200px"></div>
     </div>
     <div class="topbar-right" id="topbar-actions"></div>
+    <button id="undo-btn" onclick="doUndo()" title="Annuler la dernière action (Ctrl+Z)" style="background:var(--surf2);border:1px solid var(--bdr2);border-radius:var(--rs);width:36px;height:32px;cursor:pointer;font-size:15px;display:none;align-items:center;justify-content:center;color:var(--ink2);margin-left:8px;position:relative">
+      ↩
+      <span id="undo-count" style="position:absolute;top:-4px;right:-4px;background:var(--pur-m);color:#fff;font-size:9px;font-weight:700;width:14px;height:14px;border-radius:99px;display:flex;align-items:center;justify-content:center">0</span>
+    </button>
   </div>
   <div class="content">
 
@@ -2066,6 +2070,7 @@ async function saveDoc(){
   if(!imm.documents)imm.documents=[];
   const titre=$('doc-titre').value.trim();
   if(!titre){toast('Titre requis','err');return;}
+  snapshot(editDocId?'Modifier document':'Ajouter document');
 
   const docId=editDocId||uid();
   let data={id:docId,titre,cat:$('doc-cat').value,date:$('doc-date').value,notes:$('doc-notes').value.trim()};
@@ -2113,6 +2118,7 @@ function deleteDoc(id){
   const imm=activeImm();if(!imm)return;
   const doc=imm.documents.find(d=>d.id===id);
   if(!confirm(`Supprimer le document "${doc?.titre||''}"?`))return;
+  snapshot('Supprimer document');
   imm.documents=imm.documents.filter(d=>d.id!==id);
   save();renderDocs();
   toast('Document supprimé');
@@ -2310,6 +2316,7 @@ function saveEch(){
   const titre=$('ech-titre').value.trim();
   const date=$('ech-date').value;
   if(!titre||!date){toast('Titre et date requis','err');return;}
+  snapshot(editEchId?'Modifier échéance':'Ajouter échéance');
   const data={
     id:editEchId||uid(),
     titre,
@@ -2330,9 +2337,67 @@ function deleteEch(id){
   const imm=activeImm();if(!imm)return;
   const e=(imm.echeances||[]).find(x=>x.id===id);
   if(!confirm(`Supprimer l'échéance "${e?.titre||''}"?`))return;
+  snapshot('Supprimer échéance');
   imm.echeances=imm.echeances.filter(x=>x.id!==id);
   save();renderEch();toast('Échéance supprimée');
 }
+
+// ══════════════════════════════════════════════════
+// SYSTÈME D'ANNULATION (UNDO)
+// ══════════════════════════════════════════════════
+const UNDO_MAX = 5;
+let _undoStack = [];
+
+function snapshot(actionLabel){
+  // Deep clone current state
+  const state = JSON.parse(JSON.stringify(immeubles));
+  _undoStack.push({state, label:actionLabel, ts:Date.now()});
+  if(_undoStack.length > UNDO_MAX) _undoStack.shift();
+  updateUndoBtn();
+}
+
+function updateUndoBtn(){
+  const btn = $('undo-btn');
+  const cnt = $('undo-count');
+  if(!btn) return;
+  if(_undoStack.length > 0){
+    btn.style.display = 'inline-flex';
+    if(cnt) cnt.textContent = _undoStack.length;
+    const last = _undoStack[_undoStack.length-1];
+    btn.title = `Annuler : ${last.label} (Ctrl+Z)`;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function doUndo(){
+  if(_undoStack.length === 0){ toast('Rien à annuler','err'); return; }
+  const item = _undoStack.pop();
+  immeubles = item.state;
+  activeImmId = immeubles.find(x=>x.id===activeImmId) ? activeImmId : (immeubles[0]?.id||null);
+  save();
+  renderRail();
+  // Re-render current panel
+  const active = document.querySelector('.panel.active');
+  if(active){
+    const id = active.id.replace('panel-','');
+    showPanel(id);
+  }
+  updateUndoBtn();
+  toast(`↩ Annulé : ${item.label}`, 'ok');
+  logActivity('Annulation', item.label);
+}
+
+// Keyboard shortcut Ctrl+Z
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey){
+    // Don't intercept in text inputs
+    const tag = document.activeElement?.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+    e.preventDefault();
+    doUndo();
+  }
+});
 
 // ══════════════════════════════════════════════════
 // MODE SOMBRE
@@ -2458,6 +2523,7 @@ function closeAddImm(){$('ov-imm').classList.remove('open');}
 function saveImm(){
   const name=$('imm-name').value.trim();
   if(!name){toast('Nom requis','err');return;}
+  snapshot('Créer immeuble');
   const imm={id:uid(),name,addr:$('imm-addr').value.trim(),year:parseInt($('imm-yr').value)||2025,units:parseInt($('imm-units').value)||1,depenses:[],revenus:[]};
   immeubles.push(imm);save();
   activeImmId=imm.id;
@@ -2510,6 +2576,7 @@ function saveEditImm(id){
 function deleteImm(id){
   const imm=getImm(id);
   if(!confirm(`Supprimer "${imm?.name}"?\n\n⚠️ Toutes les dépenses, revenus et factures seront perdus.`))return;
+  snapshot('Supprimer immeuble '+(imm?.name||''));
   immeubles=immeubles.filter(x=>x.id!==id);
   if(activeImmId===id)activeImmId=immeubles[0]?.id||null;
   save();renderRail();closeAddImm();
@@ -2641,7 +2708,7 @@ function renderRev(){
 function toggleRevPaid(id,checked){
   const imm=activeImm();if(!imm)return;
   const r=imm.revenus.find(x=>x.id===id);
-  if(r){r.paye=checked;save();renderRev();}
+  if(r){snapshot('Modifier paiement');r.paye=checked;save();renderRev();}
 }
 
 // ══════════════════════════════════════════════════
@@ -3118,6 +3185,7 @@ function openEditRev(id){
 
 function saveMan(){
   const imm=activeImm();if(!imm)return;
+  snapshot(editId?'Modifier entrée':'Ajouter entrée');
   if(manType==='dep'){
     const date=$('md-date').value,desc=$('md-desc').value.trim(),mont=parseFloat($('md-mont').value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return;}
@@ -3144,6 +3212,7 @@ function delEntry(id,type){
   if(!confirm('Supprimer cette entrée?'))return;
   const imm=activeImm();
   const entry = type==='dep' ? imm.depenses.find(d=>d.id===id) : imm.revenus.find(r=>r.id===id);
+  snapshot(type==='dep'?'Supprimer dépense':'Supprimer revenu');
   if(type==='dep')imm.depenses=imm.depenses.filter(d=>d.id!==id);
   else imm.revenus=imm.revenus.filter(r=>r.id!==id);
   save();
@@ -3466,6 +3535,7 @@ function updST(){
 
 async function saveScanEntry(){
   const imm=activeImm();if(!imm)return false;
+  snapshot('Ajouter facture scannée');
   // Validate first
   let entryData, isDepense = scanType==='dep';
   if(isDepense){
@@ -3650,6 +3720,7 @@ async function saveLoc(){
   const prenom=$('loc-prenom').value.trim();
   const nom=$('loc-nom').value.trim();
   if(!prenom&&!nom){toast('Nom ou prénom requis','err');return;}
+  snapshot(editLocId?'Modifier locataire':'Ajouter locataire');
   const data={prenom,nom,tel:$('loc-tel').value.trim(),unite:$('loc-unite').value.trim()};
 
   // Handle bail upload
@@ -3699,6 +3770,7 @@ function deleteLoc(id){
   const imm=activeImm();if(!imm)return;
   const loc=imm.locataires.find(l=>l.id===id);
   if(!confirm(`Supprimer le locataire "${loc?.prenom||''} ${loc?.nom||''}"?`))return;
+  snapshot('Supprimer locataire');
   imm.locataires=imm.locataires.filter(l=>l.id!==id);
   save();renderLoc();toast('Locataire supprimé');
 }
@@ -3841,6 +3913,7 @@ function saveHyp(){
   let paiement=parseFloat($('hyp-paiement').value)||0;
   const debut=$('hyp-debut').value;
   if(!solde||!taux){toast('Solde et taux requis','err');return;}
+  snapshot('Modifier hypothèque');
   if(!paiement)paiement=calcPaiementMensuel(solde,taux,amort);
   imm.hypotheque={valeurMarchande:valeur,soldeInitial:solde,taux,amortissement:amort,paiement,debut};
   save();renderHyp();closeHypModal();
@@ -3878,6 +3951,7 @@ function saveParts(){
   const c=parseFloat($('part-jc').value)||0;
   const total=j+a+c;
   if(Math.abs(total-100)>0.01){toast('Le total doit faire 100% (actuellement '+total.toFixed(2)+'%)','err');return;}
+  snapshot('Modifier parts de propriété');
   imm.parts={Jim:j,Antoine:a,'Jean-Christophe':c};
   save();renderRemb();closePartsModal();
   toast('Parts enregistrées','ok');
@@ -3945,6 +4019,7 @@ async function saveRemb(){
   const mont=parseFloat($('remb-mont').value);
   const desc=$('remb-desc').value.trim();
   if(!date||!mont||mont<=0){toast('Date et montant requis','err');return;}
+  snapshot(editRembId?'Modifier transaction':'Ajouter transaction');
 
   const entryId=editRembId||uid();
   let entry={id:entryId,type:rembModalType,date,montant:mont,desc};
@@ -4001,6 +4076,7 @@ async function saveRemb(){
 function deleteRemb(id){
   if(!confirm('Supprimer cette transaction?'))return;
   const imm=activeImm();
+  snapshot('Supprimer transaction');
   imm.remboursements=(imm.remboursements||[]).filter(r=>r.id!==id);
   save();renderRemb();
   toast('Supprimé');
@@ -4282,6 +4358,8 @@ async function settleRemb(){
   const todayISO=new Date().toISOString().slice(0,10);
   const transferSummary=transfers.map(t=>`  • ${t.from} → ${t.to} : ${fmt(t.amount)}`).join('\n');
   if(!confirm(`Régler les comptes au ${todayISO}?\n\nLes transferts suivants seront ajoutés automatiquement :\n\n${transferSummary}\n\nLes transactions actuelles seront archivées dans l'Historique et les soldes redémarreront à zéro.\n\nContinuer?`))return;
+
+  snapshot('Régler les comptes au '+todayISO);
 
   // Add each settlement transfer as a manual entry
   transfers.forEach(t=>{
