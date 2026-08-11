@@ -4013,18 +4013,34 @@ function renderRemb(){
   const partners=['Jim','Antoine','Jean-Christophe'];
   const PARTNER_COLORS={Jim:'#3b82f6',Antoine:'#10b981','Jean-Christophe':'#f59e0b',Commun:'#9090b0'};
 
-  // ── 1) Depenses from accounting (with payepar) — filtered by year ──
+  // Get the last clôture date (période active starts after this date)
+  const clotureDate=imm.rembClotureDate||null; // ex: '2026-03-31'
+  const view=imm._rembView||'active'; // 'active' or 'history'
+
+  // Filter based on view
+  const yearStr=String(activeYear);
+  const inCurrentYear=(dateStr)=>dateStr&&dateStr.startsWith(yearStr);
+  const afterCloture=(dateStr)=>!clotureDate||dateStr>clotureDate;
+  const beforeOrOnCloture=(dateStr)=>clotureDate&&dateStr<=clotureDate;
+
+  // ── Depenses comptables (filtered by year AND period) ──
   const paid={Jim:0,Antoine:0,'Jean-Christophe':0,Commun:0};
   const deps=filterByYear(imm.depenses||[]);
   deps.forEach(d=>{
+    if(view==='active' && !afterCloture(d.date))return;
+    if(view==='history' && !beforeOrOnCloture(d.date))return;
     const total=(d.montant||0)+(d.tax||0);
     const who=d.payepar||'Commun';
     paid[who]=(paid[who]||0)+total;
   });
 
-  // ── 2) Manual remboursements (filtered by year) ──
+  // ── Manual remboursements (filtered by year AND period) ──
   const allRembs=imm.remboursements||[];
-  const rembs=allRembs.filter(r=>r.date&&r.date.startsWith(String(activeYear)));
+  const rembs=allRembs.filter(r=>{
+    if(!r.date||!inCurrentYear(r.date))return false;
+    if(view==='active')return afterCloture(r.date);
+    return beforeOrOnCloture(r.date);
+  });
   rembs.forEach(r=>{
     if(r.type==='depense'){
       const who=r.payepar||'Commun';
@@ -4032,22 +4048,21 @@ function renderRemb(){
     }
   });
 
-  // ── 3) Calculate share based ONLY on personal payments (exclude Compte commun) ──
+  // ── Calculate share based on personal payments only ──
   const totalPersonnel=paid.Jim+paid.Antoine+paid['Jean-Christophe'];
-  const totalShared=totalPersonnel+paid.Commun; // for display only
+  const totalShared=totalPersonnel+paid.Commun;
   const share={
     Jim:totalPersonnel*(parts.Jim||0)/100,
     Antoine:totalPersonnel*(parts.Antoine||0)/100,
     'Jean-Christophe':totalPersonnel*(parts['Jean-Christophe']||0)/100
   };
-  // Balance: positive = others owe them
   const balance={
     Jim:paid.Jim-share.Jim,
     Antoine:paid.Antoine-share.Antoine,
     'Jean-Christophe':paid['Jean-Christophe']-share['Jean-Christophe']
   };
 
-  // ── 3) Apply direct transfers ──
+  // Apply direct transfers
   rembs.forEach(r=>{
     if(r.type==='transfert'){
       balance[r.from]=(balance[r.from]||0)+(r.montant||0);
@@ -4055,7 +4070,7 @@ function renderRemb(){
     }
   });
 
-  // ── 4) Settlement transfers ──
+  // Calculate settlement transfers
   const transfers=[];
   const creditors=partners.filter(p=>balance[p]>0.01).map(p=>({name:p,amount:balance[p]}));
   const debtors=partners.filter(p=>balance[p]<-0.01).map(p=>({name:p,amount:-balance[p]}));
@@ -4073,17 +4088,29 @@ function renderRemb(){
 
   const list=[...rembs].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
-  // Count auto vs manual
-  const nbAuto=deps.filter(d=>d.payepar).length;
-  const nbAutoCommun=deps.filter(d=>!d.payepar).length;
+  // Total transactions manuelles
+  const totalDepManuelles=rembs.filter(r=>r.type==='depense').reduce((s,r)=>s+(r.montant||0),0);
+  const totalTransferts=rembs.filter(r=>r.type==='transfert').reduce((s,r)=>s+(r.montant||0),0);
+
+  // Tabs
+  const tabsHtml=`<div style="display:flex;gap:2px;background:var(--surf2);border:1px solid var(--bdr);border-radius:var(--rs);padding:3px;margin-bottom:1rem;width:fit-content">
+    <button onclick="switchRembView('active')" style="background:${view==='active'?'var(--surf)':'transparent'};color:${view==='active'?'var(--ink)':'var(--ink3)'};border:none;padding:6px 14px;border-radius:calc(var(--rs) - 2px);cursor:pointer;font-size:13px;font-weight:${view==='active'?'700':'500'};${view==='active'?'box-shadow:0 1px 3px rgba(0,0,0,.08)':''}">📊 Période active</button>
+    <button onclick="switchRembView('history')" style="background:${view==='history'?'var(--surf)':'transparent'};color:${view==='history'?'var(--ink)':'var(--ink3)'};border:none;padding:6px 14px;border-radius:calc(var(--rs) - 2px);cursor:pointer;font-size:13px;font-weight:${view==='history'?'700':'500'};${view==='history'?'box-shadow:0 1px 3px rgba(0,0,0,.08)':''}">📚 Historique</button>
+  </div>`;
+
+  const periodInfo=view==='active'
+    ? (clotureDate?`Depuis le ${clotureDate}`:`Toutes les données ${activeYear}`)
+    : (clotureDate?`Jusqu'au ${clotureDate}`:'Aucun règlement effectué');
 
   $('remb-content').innerHTML=`
+    ${tabsHtml}
+
     <!-- Parts -->
     <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.75rem">
         <div>
           <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;font-weight:600">Parts de propriété — ${imm.name}</div>
-          <div style="font-size:13px;color:var(--ink2);margin-top:2px">Total dépenses ${activeYear} : <strong>${fmt(totalShared)}</strong> <span style="color:var(--ink3);font-size:11px">(dont ${fmt(totalPersonnel)} payé personnellement · ${fmt(paid.Commun)} compte commun)</span></div>
+          <div style="font-size:13px;color:var(--ink2);margin-top:2px">Total dépenses (${periodInfo}) : <strong>${fmt(totalShared)}</strong> <span style="color:var(--ink3);font-size:11px">(personnel: ${fmt(totalPersonnel)} · commun: ${fmt(paid.Commun)})</span></div>
         </div>
         <button class="btn btn-out btn-sm" onclick="openPartsModal()">⚙ Modifier</button>
       </div>
@@ -4098,7 +4125,7 @@ function renderRemb(){
 
     <!-- Soldes -->
     <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem">
-      <div style="font-size:14px;font-weight:600;margin-bottom:.75rem">💰 Soldes (${activeYear})</div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:.75rem">💰 Soldes — ${periodInfo}</div>
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead><tr style="background:var(--surf2)"><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Partenaire</th><th style="text-align:right;padding:8px 12px;font-size:11px;text-transform:uppercase">A payé</th><th style="text-align:right;padding:8px 12px;font-size:11px;text-transform:uppercase">Devrait payer</th><th style="text-align:right;padding:8px 12px;font-size:11px;text-transform:uppercase">Solde</th></tr></thead>
         <tbody>
@@ -4114,9 +4141,12 @@ function renderRemb(){
       <div style="font-size:11px;color:var(--ink3);margin-top:.5rem;font-style:italic">💡 Le calcul exclut les dépenses du compte commun. Seuls les paiements personnels sont répartis selon les % de propriété.</div>
     </div>
 
-    <!-- Qui doit à qui -->
+    <!-- Pour équilibrer les comptes + bouton Régler -->
     <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem;margin-bottom:1.25rem">
-      <div style="font-size:14px;font-weight:600;margin-bottom:.75rem">🤝 Pour équilibrer les comptes</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.75rem">
+        <div style="font-size:14px;font-weight:600">🤝 Pour équilibrer les comptes</div>
+        ${view==='active'&&transfers.length>0?`<button class="btn btn-pur btn-sm" onclick="settleRemb()">✓ Régler les comptes</button>`:''}
+      </div>
       ${transfers.length===0?
         `<div style="text-align:center;padding:1.5rem;color:var(--ink3)">✅ Tous les comptes sont équilibrés!</div>`:
         transfers.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:.875rem;background:var(--surf2);border-radius:var(--rs);margin-bottom:.5rem;border-left:3px solid var(--pur-m)">
@@ -4127,20 +4157,21 @@ function renderRemb(){
           </div>
           <div style="font-size:1.1rem;font-weight:700;color:var(--ink)">${fmt(t.amount)}</div>
         </div>`).join('')}
+      ${view==='active'&&transfers.length>0?`<div style="font-size:11px;color:var(--ink3);margin-top:.5rem;font-style:italic">💡 Cliquez « Régler les comptes » pour créer automatiquement ces transferts et remettre les soldes à zéro. Les données passées sont conservées dans l'historique.</div>`:''}
     </div>
 
-    <!-- Liste des transactions manuelles -->
+    <!-- Liste des transactions manuelles + totaux -->
     <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.25rem">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-        <div style="font-size:14px;font-weight:600">📋 Transactions manuelles (${list.length})</div>
-        <div style="display:flex;gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem">
+        <div style="font-size:14px;font-weight:600">📋 Transactions manuelles (${list.length}) — ${periodInfo}</div>
+        ${view==='active'?`<div style="display:flex;gap:6px">
           <button class="btn btn-out btn-xs" onclick="openRembModal('depense')">+ Dépense partagée</button>
           <button class="btn btn-ink btn-xs" onclick="openRembModal('transfert')">🔄 Transfert</button>
-        </div>
+        </div>`:''}
       </div>
       <div style="font-size:11px;color:var(--ink3);margin-bottom:.5rem;font-style:italic">Ces transactions n'apparaissent PAS dans les dépenses comptables.</div>
       ${list.length===0?
-        `<div style="text-align:center;padding:1.5rem;color:var(--ink3);font-size:13px">Aucune transaction manuelle pour ${activeYear}</div>`:
+        `<div style="text-align:center;padding:1.5rem;color:var(--ink3);font-size:13px">Aucune transaction dans cette période</div>`:
         `<table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr style="background:var(--surf2)"><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Date</th><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Type</th><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Détails</th><th style="text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase">Description</th><th style="text-align:right;padding:8px 12px;font-size:11px;text-transform:uppercase">Montant</th><th></th></tr></thead>
           <tbody>
@@ -4157,12 +4188,122 @@ function renderRemb(){
                 <td style="padding:8px 12px">${details}</td>
                 <td style="padding:8px 12px;color:var(--ink2)">${r.desc||''}</td>
                 <td style="padding:8px 12px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${fmt(r.montant)}</td>
-                <td style="padding:4px 8px;white-space:nowrap">${r.proof?`<button class="btn btn-xs" style="background:var(--blu-l);color:var(--blu);border:1px solid var(--blu-m)" onclick="window.open('${r.proof}','_blank')" title="Voir la preuve">📎</button> `:''}<button class="btn btn-out btn-xs" onclick="openRembModal('${r.type}','${r.id}')">✏</button> <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #fca5a5" onclick="deleteRemb('${r.id}')">✕</button></td>
+                <td style="padding:4px 8px;white-space:nowrap">${r.proof?`<button class="btn btn-xs" style="background:var(--blu-l);color:var(--blu);border:1px solid var(--blu-m)" onclick="window.open('${r.proof}','_blank')" title="Voir la preuve">📎</button> `:''}${view==='active'?`<button class="btn btn-out btn-xs" onclick="openRembModal('${r.type}','${r.id}')">✏</button> <button class="btn btn-xs" style="background:var(--red-l);color:var(--red);border:1px solid #fca5a5" onclick="deleteRemb('${r.id}')">✕</button>`:''}</td>
               </tr>`;
             }).join('')}
           </tbody>
+          <tfoot>
+            <tr style="background:var(--surf2);font-weight:700;border-top:2px solid var(--bdr2)">
+              <td colspan="4" style="padding:10px 12px;text-align:right">Total dépenses partagées</td>
+              <td style="padding:10px 12px;text-align:right;color:var(--blu);font-variant-numeric:tabular-nums">${fmt(totalDepManuelles)}</td>
+              <td></td>
+            </tr>
+            <tr style="background:var(--surf2);font-weight:700">
+              <td colspan="4" style="padding:10px 12px;text-align:right">Total transferts directs</td>
+              <td style="padding:10px 12px;text-align:right;color:var(--pur);font-variant-numeric:tabular-nums">${fmt(totalTransferts)}</td>
+              <td></td>
+            </tr>
+            <tr style="background:var(--surf3);font-weight:700;border-top:2px solid var(--bdr2)">
+              <td colspan="4" style="padding:10px 12px;text-align:right;font-size:14px">TOTAL des transactions manuelles</td>
+              <td style="padding:10px 12px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums">${fmt(totalDepManuelles+totalTransferts)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
         </table>`}
     </div>`;
+}
+
+function switchRembView(view){
+  const imm=activeImm();if(!imm)return;
+  imm._rembView=view;
+  renderRemb();
+}
+
+async function settleRemb(){
+  const imm=activeImm();if(!imm)return;
+  if(!imm.remboursements)imm.remboursements=[];
+
+  // Recompute transfers (same logic as renderRemb)
+  const parts=imm.parts||{Jim:33.33,Antoine:33.33,'Jean-Christophe':33.34};
+  const partners=['Jim','Antoine','Jean-Christophe'];
+  const clotureDate=imm.rembClotureDate||null;
+  const yearStr=String(activeYear);
+  const afterCloture=(dateStr)=>!clotureDate||dateStr>clotureDate;
+
+  const paid={Jim:0,Antoine:0,'Jean-Christophe':0,Commun:0};
+  filterByYear(imm.depenses||[]).forEach(d=>{
+    if(!afterCloture(d.date))return;
+    const total=(d.montant||0)+(d.tax||0);
+    const who=d.payepar||'Commun';
+    paid[who]=(paid[who]||0)+total;
+  });
+  const rembs=(imm.remboursements||[]).filter(r=>r.date&&r.date.startsWith(yearStr)&&afterCloture(r.date));
+  rembs.forEach(r=>{
+    if(r.type==='depense'){
+      const who=r.payepar||'Commun';
+      paid[who]=(paid[who]||0)+(r.montant||0);
+    }
+  });
+  const totalPersonnel=paid.Jim+paid.Antoine+paid['Jean-Christophe'];
+  const share={
+    Jim:totalPersonnel*(parts.Jim||0)/100,
+    Antoine:totalPersonnel*(parts.Antoine||0)/100,
+    'Jean-Christophe':totalPersonnel*(parts['Jean-Christophe']||0)/100
+  };
+  const balance={
+    Jim:paid.Jim-share.Jim,
+    Antoine:paid.Antoine-share.Antoine,
+    'Jean-Christophe':paid['Jean-Christophe']-share['Jean-Christophe']
+  };
+  rembs.forEach(r=>{
+    if(r.type==='transfert'){
+      balance[r.from]=(balance[r.from]||0)+(r.montant||0);
+      balance[r.to]=(balance[r.to]||0)-(r.montant||0);
+    }
+  });
+
+  const transfers=[];
+  const creditors=partners.filter(p=>balance[p]>0.01).map(p=>({name:p,amount:balance[p]}));
+  const debtors=partners.filter(p=>balance[p]<-0.01).map(p=>({name:p,amount:-balance[p]}));
+  creditors.sort((a,b)=>b.amount-a.amount);
+  debtors.sort((a,b)=>b.amount-a.amount);
+  let i=0,j=0;
+  while(i<debtors.length&&j<creditors.length){
+    const amt=Math.min(debtors[i].amount,creditors[j].amount);
+    if(amt>0.01)transfers.push({from:debtors[i].name,to:creditors[j].name,amount:amt});
+    debtors[i].amount-=amt;
+    creditors[j].amount-=amt;
+    if(debtors[i].amount<0.01)i++;
+    if(creditors[j].amount<0.01)j++;
+  }
+
+  if(transfers.length===0){toast('Les comptes sont déjà équilibrés','ok');return;}
+
+  const todayISO=new Date().toISOString().slice(0,10);
+  const transferSummary=transfers.map(t=>`  • ${t.from} → ${t.to} : ${fmt(t.amount)}`).join('\n');
+  if(!confirm(`Régler les comptes au ${todayISO}?\n\nLes transferts suivants seront ajoutés automatiquement :\n\n${transferSummary}\n\nLes transactions actuelles seront archivées dans l'Historique et les soldes redémarreront à zéro.\n\nContinuer?`))return;
+
+  // Add each settlement transfer as a manual entry
+  transfers.forEach(t=>{
+    imm.remboursements.push({
+      id:uid(),
+      type:'transfert',
+      date:todayISO,
+      montant:t.amount,
+      desc:`Règlement au ${todayISO}`,
+      from:t.from,
+      to:t.to,
+      auto:true
+    });
+  });
+
+  // Set clôture date to today
+  imm.rembClotureDate=todayISO;
+  save();
+  toast('✓ Comptes réglés — historique conservé','ok');
+  logActivity('Règlement des comptes', `${imm.name}: ${transfers.length} transfert${transfers.length>1?'s':''} au ${todayISO}`);
+  imm._rembView='active';
+  renderRemb();
 }
 
 // ══════════════════════════════════════════════════
