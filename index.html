@@ -3190,16 +3190,16 @@ function saveMan(){
     const date=$('md-date').value,desc=$('md-desc').value.trim(),mont=parseFloat($('md-mont').value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return;}
     const obj={id:editId||uid(),date,desc,cat:$('md-cat').value,fournisseur:$('md-four').value.trim(),montant:mont,tax:parseFloat($('md-tax').value)||0,payepar:$('md-payepar').value||'',notes:$('md-notes').value.trim()};
-    // For new entries only, init receipt fields
-    if(!editId){obj.receipt=null;obj.receiptName='';}
-    // For edits, the spread will preserve existing receipt/receiptName/receiptPath
+    // For new entries only, init receipt fields and set creation date
+    if(!editId){obj.receipt=null;obj.receiptName='';obj.createdAt=new Date().toISOString();}
+    // For edits, the spread will preserve existing receipt/receiptName/receiptPath/createdAt
     if(editId)imm.depenses=imm.depenses.map(d=>d.id===editId?{...d,...obj}:d);
     else imm.depenses.push(obj);
   }else{
     const date=$('mr-date').value,desc=$('mr-desc').value.trim(),mont=parseFloat($('mr-mont').value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return;}
     const obj={id:editId||uid(),date,desc,cat:$('mr-cat').value,source:$('mr-src').value.trim(),unite:$('mr-unite').value.trim(),montant:mont,recu:$('mr-recu').value.trim(),notes:$('mr-notes').value.trim()};
-    if(!editId){obj.receipt=null;obj.receiptName='';}
+    if(!editId){obj.receipt=null;obj.receiptName='';obj.createdAt=new Date().toISOString();}
     if(editId)imm.revenus=imm.revenus.map(r=>r.id===editId?{...r,...obj}:r);
     else imm.revenus.push(obj);
   }
@@ -3541,11 +3541,11 @@ async function saveScanEntry(){
   if(isDepense){
     const date=$('sd-date')?.value,desc=$('sd-desc')?.value?.trim(),mont=parseFloat($('sd-mont')?.value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return false;}
-    entryData={id:uid(),date,desc,cat:$('sd-cat')?.value||'',fournisseur:$('sd-four')?.value?.trim()||'',montant:mont,tax:parseFloat($('sd-tax')?.value)||0,payepar:$('sd-payepar')?.value||'',notes:$('sd-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||''};
+    entryData={id:uid(),date,desc,cat:$('sd-cat')?.value||'',fournisseur:$('sd-four')?.value?.trim()||'',montant:mont,tax:parseFloat($('sd-tax')?.value)||0,payepar:$('sd-payepar')?.value||'',notes:$('sd-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||'',createdAt:new Date().toISOString()};
   }else{
     const date=$('sr-date')?.value,desc=$('sr-desc')?.value?.trim(),mont=parseFloat($('sr-mont')?.value);
     if(!date||!desc||!mont){toast('Date, description et montant requis','err');return false;}
-    entryData={id:uid(),date,desc,cat:$('sr-cat')?.value||'',source:$('sr-src')?.value?.trim()||'',unite:$('sr-unite')?.value?.trim()||'',montant:mont,recu:$('sr-recu')?.value?.trim()||'',notes:$('sr-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||''};
+    entryData={id:uid(),date,desc,cat:$('sr-cat')?.value||'',source:$('sr-src')?.value?.trim()||'',unite:$('sr-unite')?.value?.trim()||'',montant:mont,recu:$('sr-recu')?.value?.trim()||'',notes:$('sr-notes')?.value?.trim()||'',receipt:null,receiptName:curScanFile?.name||'',createdAt:new Date().toISOString()};
   }
 
   // Upload image to Firebase Storage if present
@@ -4023,6 +4023,7 @@ async function saveRemb(){
 
   const entryId=editRembId||uid();
   let entry={id:entryId,type:rembModalType,date,montant:mont,desc};
+  if(!editRembId) entry.createdAt=new Date().toISOString();
   if(rembModalType==='depense'){
     entry.payepar=$('remb-payepar').value;
   }else{
@@ -4089,22 +4090,39 @@ function renderRemb(){
   const partners=['Jim','Antoine','Jean-Christophe'];
   const PARTNER_COLORS={Jim:'#3b82f6',Antoine:'#10b981','Jean-Christophe':'#f59e0b',Commun:'#9090b0'};
 
-  // Get the last clôture date (période active starts after this date)
+  // Get the last clôture (période active starts after this timestamp)
   const clotureDate=imm.rembClotureDate||null; // ex: '2026-03-31'
+  const clotureTs=imm.rembClotureTs||null; // ex: '2026-03-31T14:22:00.000Z'
   const view=imm._rembView||'active'; // 'active' or 'history'
 
-  // Filter based on view
+  // Filter based on view — uses createdAt timestamp if available, falls back to date
   const yearStr=String(activeYear);
   const inCurrentYear=(dateStr)=>dateStr&&dateStr.startsWith(yearStr);
-  const afterCloture=(dateStr)=>!clotureDate||dateStr>clotureDate;
-  const beforeOrOnCloture=(dateStr)=>clotureDate&&dateStr<=clotureDate;
+
+  // Check if entry is in active period (after clôture)
+  const isInActivePeriod=(entry)=>{
+    if(!clotureTs && !clotureDate) return true; // no clôture yet = everything is active
+    // Use createdAt if available (entered AFTER clôture = active)
+    if(entry.createdAt && clotureTs){
+      return entry.createdAt > clotureTs;
+    }
+    // Fallback: use the entry date
+    return entry.date > clotureDate;
+  };
+  const isInHistoryPeriod=(entry)=>{
+    if(!clotureTs && !clotureDate) return false;
+    if(entry.createdAt && clotureTs){
+      return entry.createdAt <= clotureTs;
+    }
+    return entry.date <= clotureDate;
+  };
 
   // ── Depenses comptables (filtered by year AND period) ──
   const paid={Jim:0,Antoine:0,'Jean-Christophe':0,Commun:0};
   const deps=filterByYear(imm.depenses||[]);
   deps.forEach(d=>{
-    if(view==='active' && !afterCloture(d.date))return;
-    if(view==='history' && !beforeOrOnCloture(d.date))return;
+    if(view==='active' && !isInActivePeriod(d))return;
+    if(view==='history' && !isInHistoryPeriod(d))return;
     const total=(d.montant||0)+(d.tax||0);
     const who=d.payepar||'Commun';
     paid[who]=(paid[who]||0)+total;
@@ -4114,8 +4132,8 @@ function renderRemb(){
   const allRembs=imm.remboursements||[];
   const rembs=allRembs.filter(r=>{
     if(!r.date||!inCurrentYear(r.date))return false;
-    if(view==='active')return afterCloture(r.date);
-    return beforeOrOnCloture(r.date);
+    if(view==='active')return isInActivePeriod(r);
+    return isInHistoryPeriod(r);
   });
   rembs.forEach(r=>{
     if(r.type==='depense'){
@@ -4299,21 +4317,26 @@ async function settleRemb(){
   const imm=activeImm();if(!imm)return;
   if(!imm.remboursements)imm.remboursements=[];
 
-  // Recompute transfers (same logic as renderRemb)
+  // Recompute transfers (same logic as renderRemb — uses createdAt when available)
   const parts=imm.parts||{Jim:33.33,Antoine:33.33,'Jean-Christophe':33.34};
   const partners=['Jim','Antoine','Jean-Christophe'];
   const clotureDate=imm.rembClotureDate||null;
+  const clotureTs=imm.rembClotureTs||null;
   const yearStr=String(activeYear);
-  const afterCloture=(dateStr)=>!clotureDate||dateStr>clotureDate;
+  const isInActivePeriod=(entry)=>{
+    if(!clotureTs && !clotureDate) return true;
+    if(entry.createdAt && clotureTs) return entry.createdAt > clotureTs;
+    return entry.date > clotureDate;
+  };
 
   const paid={Jim:0,Antoine:0,'Jean-Christophe':0,Commun:0};
   filterByYear(imm.depenses||[]).forEach(d=>{
-    if(!afterCloture(d.date))return;
+    if(!isInActivePeriod(d))return;
     const total=(d.montant||0)+(d.tax||0);
     const who=d.payepar||'Commun';
     paid[who]=(paid[who]||0)+total;
   });
-  const rembs=(imm.remboursements||[]).filter(r=>r.date&&r.date.startsWith(yearStr)&&afterCloture(r.date));
+  const rembs=(imm.remboursements||[]).filter(r=>r.date&&r.date.startsWith(yearStr)&&isInActivePeriod(r));
   rembs.forEach(r=>{
     if(r.type==='depense'){
       const who=r.payepar||'Commun';
@@ -4362,6 +4385,7 @@ async function settleRemb(){
   snapshot('Régler les comptes au '+todayISO);
 
   // Add each settlement transfer as a manual entry
+  const nowISO=new Date().toISOString();
   transfers.forEach(t=>{
     imm.remboursements.push({
       id:uid(),
@@ -4371,12 +4395,14 @@ async function settleRemb(){
       desc:`Règlement au ${todayISO}`,
       from:t.from,
       to:t.to,
-      auto:true
+      auto:true,
+      createdAt:nowISO
     });
   });
 
-  // Set clôture date to today
+  // Set clôture with full timestamp (so future entries always land in active period)
   imm.rembClotureDate=todayISO;
+  imm.rembClotureTs=new Date().toISOString(); // full timestamp for precise comparison
   save();
   toast('✓ Comptes réglés — historique conservé','ok');
   logActivity('Règlement des comptes', `${imm.name}: ${transfers.length} transfert${transfers.length>1?'s':''} au ${todayISO}`);
