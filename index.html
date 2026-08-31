@@ -4100,19 +4100,25 @@ function renderRemb(){
   const inCurrentYear=(dateStr)=>dateStr&&dateStr.startsWith(yearStr);
 
   // Check if entry is in active period (after clôture)
+  // Uses createdAt timestamp when available.
+  // If entry has NO createdAt (old entry), we check its date against clôture date.
+  // BUT: if the entry was created AFTER the clôture was set (recent entry), it should be active.
   const isInActivePeriod=(entry)=>{
     if(!clotureTs && !clotureDate) return true; // no clôture yet = everything is active
-    // Use createdAt if available (entered AFTER clôture = active)
-    if(entry.createdAt && clotureTs){
-      return entry.createdAt > clotureTs;
+    // Priority 1: use createdAt if available
+    if(entry.createdAt){
+      if(clotureTs) return entry.createdAt > clotureTs;
+      // Old-style clôture date only: compare createdAt date part
+      return entry.createdAt.slice(0,10) > clotureDate;
     }
-    // Fallback: use the entry date
+    // No createdAt = old entry: use the entry date
     return entry.date > clotureDate;
   };
   const isInHistoryPeriod=(entry)=>{
     if(!clotureTs && !clotureDate) return false;
-    if(entry.createdAt && clotureTs){
-      return entry.createdAt <= clotureTs;
+    if(entry.createdAt){
+      if(clotureTs) return entry.createdAt <= clotureTs;
+      return entry.createdAt.slice(0,10) <= clotureDate;
     }
     return entry.date <= clotureDate;
   };
@@ -4325,7 +4331,10 @@ async function settleRemb(){
   const yearStr=String(activeYear);
   const isInActivePeriod=(entry)=>{
     if(!clotureTs && !clotureDate) return true;
-    if(entry.createdAt && clotureTs) return entry.createdAt > clotureTs;
+    if(entry.createdAt){
+      if(clotureTs) return entry.createdAt > clotureTs;
+      return entry.createdAt.slice(0,10) > clotureDate;
+    }
     return entry.date > clotureDate;
   };
 
