@@ -3401,7 +3401,12 @@ Si absent: null. Montants en CAD.`;
     clearInterval(ticker);$('ai-proc').style.display='none';
     if(!resp.ok)throw new Error((await resp.json()).error?.message||'Erreur API');
     const data=await resp.json();
-    const txt=data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
+    let txt=data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
+    // Extract JSON object even if there's text before/after
+    const firstBrace=txt.indexOf('{');
+    const lastBrace=txt.lastIndexOf('}');
+    if(firstBrace===-1||lastBrace===-1)throw new Error('Aucun JSON trouvé dans la réponse');
+    txt=txt.substring(firstBrace,lastBrace+1);
     const parsed=JSON.parse(txt);
     $('scan-form-area').innerHTML=buildScanForm(type,parsed);
   }catch(err){
